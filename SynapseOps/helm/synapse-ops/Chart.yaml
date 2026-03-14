@@ -1,0 +1,6 @@
+apiVersion: v2
+name: synapse-ops
+description: SynapseOps - Intelligent API Monitoring & Auto-Remediation Agent
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
