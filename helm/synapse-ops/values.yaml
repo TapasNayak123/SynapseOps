@@ -1,0 +1,46 @@
+replicaCount: 1
+
+image:
+  repository: 551494044780.dkr.ecr.us-east-1.amazonaws.com/synapse-ops
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 256m
+    memory: 512Mi
+  limits:
+    cpu: 512m
+    memory: 1Gi
+
+env:
+  # Target Node.js app
+  AWS_REGION: us-east-1
+  CLOUDWATCH_LOG_GROUP: /aws/eks/auth-api
+  GITHUB_REPO: TapasNayak123/aws_codethon_repo
+  MONITORED_APIS: "/api/auth/register,/api/auth/login,/api/products"
+
+  # Agent infra
+  DYNAMODB_TABLE_PREFIX: synapse-ops
+  REDIS_URL: redis://redis-master:6379/0
+  BEDROCK_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
+  BEDROCK_REGION: us-east-1
+  ERROR_RATE_THRESHOLD: "50.0"
+  SLOW_API_THRESHOLD_MS: "2000"
+
+secrets:
+  TEAMS_WEBHOOK_URL: ""
+  GITHUB_TOKEN: ""
+
+serviceAccount:
+  create: true
+  name: synapse-ops-sa
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::551494044780:role/synapse-ops-role
+
+ingress:
+  enabled: false
