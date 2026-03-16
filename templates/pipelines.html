@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Pipeline Monitor — SynapseOps{% endblock %}
+{% block nav_pipelines %}active{% endblock %}
+
+{% block content %}
+<div class="page-title">🚨 <span class="accent">Pipeline</span> Monitor</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">Failures Analyzed</div>
+        <div class="value">{{ stats.total }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Repos Monitored</div>
+        <div class="value">{{ stats.repos | length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Failures by Repo</div>
+        <div class="value" style="font-size:14px; margin-top:8px;">
+            {% for repo, count in stats.repos.items() %}
+                <span class="badge badge-high">{{ repo.split('/')[-1] }}: {{ count }}</span>
+            {% endfor %}
+            {% if not stats.repos %}
+                <span style="color:#8b949e">—</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <div class="table-header">🚨 Pipeline Failures</div>
+    {% if records %}
+    <table>
+        <thead>
+            <tr>
+                <th>Workflow</th>
+                <th>Repository</th>
+                <th>Branch</th>
+                <th>Commit</th>
+                <th>Failed Jobs</th>
+                <th>Auto-Heal</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td>
+                    <a href="/pipeline/{{ r.repo }}/{{ r.run_id }}">{{ r.workflow }}</a>
+                </td>
+                <td>{{ r.repo }}</td>
+                <td>{{ r.branch }}</td>
+                <td><code>{{ r.commit_sha }}</code></td>
+                <td>
+                    {% for job in r.failed_jobs %}
+                        <span class="badge badge-high">{{ job }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if r.autoheal_status == 'fix_applied' %}
+                        <a href="{{ r.autoheal_pr }}" target="_blank"><span class="badge badge-low">✅ Fix PR</span></a>
+                    {% elif r.autoheal_status == 'fix_failed' %}
+                        <span class="badge badge-medium">⚠️ Failed</span>
+                    {% elif r.autoheal_status == 'not_fixable' %}
+                        <span class="badge badge-unknown">Manual Fix</span>
+                    {% else %}
+                        <span style="color:#8b949e">—</span>
+                    {% endif %}
+                </td>
+                <td style="color:#8b949e">{{ r.timestamp | int }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">✅</div>
+        <p>No pipeline failures detected.</p>
+        <p style="margin-top:8px;">The agent is monitoring your repos for CI/CD failures.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+setTimeout(() => location.reload(), 30000);
+</script>
+{% endblock %}

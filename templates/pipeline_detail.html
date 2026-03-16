@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Pipeline Failure — {{ p.workflow }}{% endblock %}
+{% block nav_pipelines %}active{% endblock %}
+
+{% block content %}
+<a href="/pipelines" class="back-link">← Back to Pipelines</a>
+
+<div class="detail-header">
+    <div class="detail-title">🚨 {{ p.workflow }} — Failed</div>
+    <div class="detail-meta">
+        <span>📦 {{ p.repo }}</span>
+        <span>🔀 {{ p.branch }}</span>
+        <span>📝 {{ p.commit_sha }}</span>
+        <span>❌ {{ p.failed_jobs | join(', ') }}</span>
+    </div>
+</div>
+
+<h3 style="color:#f0f6fc; margin-bottom:16px; font-size:16px;">🤖 AI Failure Analysis</h3>
+<div class="agent-card">
+    <div class="agent-card-header">
+        <span class="name">🔍 Pipeline Failure Analysis Agent</span>
+    </div>
+    <div class="agent-card-body">{{ p.analysis }}</div>
+</div>
+
+<div style="margin-top:16px;">
+    <a href="{{ p.run_url }}" target="_blank">🔗 View full pipeline run on GitHub →</a>
+</div>
+
+{% if p.autoheal_status %}
+<h3 style="color:#f0f6fc; margin: 24px 0 16px; font-size:16px;">🔧 Auto-Heal Status</h3>
+<div class="agent-card">
+    <div class="agent-card-header">
+        <span class="name">
+            {% if p.autoheal_status == 'fix_applied' %}✅ Fix Applied
+            {% elif p.autoheal_status == 'fix_failed' %}⚠️ Fix Attempt Failed
+            {% else %}ℹ️ Not Auto-Fixable
+            {% endif %}
+        </span>
+    </div>
+    <div class="agent-card-body" style="white-space:normal;">
+        {% if p.autoheal_pr %}
+            <p>A fix PR was automatically created: <a href="{{ p.autoheal_pr }}" target="_blank">{{ p.autoheal_pr }}</a></p>
+        {% elif p.autoheal_status == 'not_fixable' %}
+            <p>The AI determined this issue requires manual intervention (e.g., infrastructure, permissions, or external service issue).</p>
+        {% else %}
+            <p>The auto-heal agent attempted a fix but could not commit the changes.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

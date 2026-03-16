@@ -7,10 +7,13 @@ import logging
 from flask import Flask, request, jsonify, render_template
 
 from config import GITHUB_WEBHOOK_SECRET, WATCH_REPOS, POLL_INTERVAL
-from github_client import get_pr_details, get_pr_diff, get_pr_files, post_pr_comment, merge_pr, close_pr
-from agents import supervisor
-from store import pr_store
+from github_client import get_pr_details, get_pr_diff, get_pr_files, post_pr_comment, merge_pr
+from agents import supervisor, check_and_generate_description
+from conflict_detector import check_conflicts
+from store import pr_store, pipeline_store
 from poller import start_poller
+from pipeline_monitor import start_pipeline_monitor
+from activity_log import activity_log
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -36,6 +39,17 @@ def dashboard():
     records = pr_store.all()
     stats = pr_store.stats()
     return render_template("dashboard.html", records=records, stats=stats)
+
+
+@app.route("/metrics")
+def metrics_page():
+    metrics = pr_store.metrics()
+    return render_template("metrics.html", m=metrics)
+
+
+@app.route("/api/metrics", methods=["GET"])
+def api_metrics():
+    return jsonify(pr_store.metrics())
 
 
 @app.route("/pr/<path:repo>/<int:pr_number>")
@@ -72,6 +86,14 @@ def test_pr():
         diff = get_pr_diff(repo, pr_number)
         files = get_pr_files(repo, pr_number)
 
+        # Auto-generate description if empty
+        desc_generated = check_and_generate_description(pr_details, diff, files, repo, pr_number)
+
+        # Conflict detection
+        conflicts = check_conflicts(repo, pr_number, files,
+                                    pr_title=pr_details.get("title", ""),
+                                    pr_author=pr_details.get("user", {}).get("login", ""))
+
         summary = supervisor(pr_details, diff, files, repo, pr_number)
 
         posted = False
@@ -79,7 +101,7 @@ def test_pr():
             post_pr_comment(repo, pr_number, summary)
             posted = True
 
-        return render_template("test.html", result={"summary": summary, "posted": posted, "repo": repo, "pr_number": pr_number}, error=None)
+        return render_template("test.html", result={"summary": summary, "posted": posted, "repo": repo, "pr_number": pr_number, "desc_generated": desc_generated, "conflicts": conflicts}, error=None)
 
     except Exception as e:
         logger.exception("Test failed for %s #%s", repo, pr_number)
@@ -210,7 +232,37 @@ def reject_pr():
         return jsonify({"error": str(e)}), 500
 
 
+# ── Activity Log routes ───────────────────────────────────────────────────
+
+@app.route("/activity")
+def activity_page():
+    entries = activity_log.all()
+    return render_template("activity.html", entries=entries)
+
+
+@app.route("/api/activity", methods=["GET"])
+def api_activity():
+    since = request.args.get("since", 0, type=int)
+    entries, cursor = activity_log.since(since)
+    return jsonify({"entries": activity_log.to_dicts(entries), "cursor": cursor})
+
+
 # ── Webhook ───────────────────────────────────────────────────────────────
+
+@app.route("/pipelines")
+def pipelines_dashboard():
+    records = pipeline_store.all()
+    stats = pipeline_store.stats()
+    return render_template("pipelines.html", records=records, stats=stats)
+
+
+@app.route("/pipeline/<path:repo>/<int:run_id>")
+def pipeline_detail(repo, run_id):
+    record = pipeline_store.get(repo, run_id)
+    if not record:
+        return "Pipeline run not found", 404
+    return render_template("pipeline_detail.html", p=record)
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -240,6 +292,14 @@ def webhook():
         diff = get_pr_diff(repo_full_name, pr_number)
         files = get_pr_files(repo_full_name, pr_number)
 
+        # Auto-generate description if empty
+        check_and_generate_description(pr_details, diff, files, repo_full_name, pr_number)
+
+        # Conflict detection
+        check_conflicts(repo_full_name, pr_number, files,
+                        pr_title=pr.get("title", ""),
+                        pr_author=pr.get("user", {}).get("login", ""))
+
         summary = supervisor(pr_details, diff, files, repo_full_name, pr_number)
 
         post_pr_comment(repo_full_name, pr_number, summary)
@@ -257,7 +317,8 @@ if __name__ == "__main__":
     if WATCH_REPOS:
         logger.info("Watching repos: %s (polling every %ds)", WATCH_REPOS, POLL_INTERVAL)
         start_poller(WATCH_REPOS, POLL_INTERVAL)
+        start_pipeline_monitor(WATCH_REPOS, POLL_INTERVAL)
     else:
         logger.info("No WATCH_REPOS configured — poller disabled. Set WATCH_REPOS in .env to enable.")
 
-    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)

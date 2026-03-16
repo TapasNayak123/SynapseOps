@@ -6,12 +6,16 @@ The Supervisor orchestrates them in sequence and records results.
 
 from __future__ import annotations
 
-import re
+import logging
 import time
 
 from bedrock_client import invoke_model
+from github_client import update_pr_body, post_pr_comment
 from store import AgentResult, PRRecord, pr_store
 from teams_notifier import send_teams_notification
+from activity_log import activity_log
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -226,21 +230,32 @@ def _extract_priority(priority_output: str) -> str:
 def supervisor(pr_details: dict, diff: str, files: list[dict], repo: str, pr_number: int) -> str:
     """Run all agents in sequence, store results, and return the final summary."""
     agent_results = []
+    pr_title = pr_details.get("title", "N/A")
+
+    activity_log.emit("Supervisor", "started", f"Processing PR #{pr_number}: {pr_title}", repo=repo, pr_number=pr_number)
 
     # Step 1: Diff Analysis
+    activity_log.emit("Diff Analysis", "started", "Analyzing diff and categorizing changes...", repo=repo, pr_number=pr_number)
     diff_output, diff_dur = diff_analysis_agent(diff, files)
+    activity_log.emit("Diff Analysis", "completed", f"Categorized {len(files)} files", repo=repo, pr_number=pr_number, duration_ms=diff_dur)
     agent_results.append(AgentResult(name="Diff Analysis", output=diff_output, duration_ms=diff_dur))
 
     # Step 2: Code Review
+    activity_log.emit("Code Review", "started", "Reviewing code quality and security...", repo=repo, pr_number=pr_number)
     review_output, review_dur = code_review_agent(diff)
+    activity_log.emit("Code Review", "completed", "Code review complete", repo=repo, pr_number=pr_number, duration_ms=review_dur)
     agent_results.append(AgentResult(name="Code Review", output=review_output, duration_ms=review_dur))
 
     # Step 3: Generate Summary
+    activity_log.emit("Summary Generator", "started", "Generating PR summary...", repo=repo, pr_number=pr_number)
     summary_output, summary_dur = summary_generator_agent(pr_details, diff_output, review_output)
+    activity_log.emit("Summary Generator", "completed", "Summary generated", repo=repo, pr_number=pr_number, duration_ms=summary_dur)
     agent_results.append(AgentResult(name="Summary Generator", output=summary_output, duration_ms=summary_dur))
 
     # Step 4: Priority Assessment
+    activity_log.emit("Priority Assessment", "started", "Assessing PR priority...", repo=repo, pr_number=pr_number)
     priority_output, priority_dur = priority_agent(pr_details, diff_output, files)
+    activity_log.emit("Priority Assessment", "completed", "Priority assessed", repo=repo, pr_number=pr_number, duration_ms=priority_dur)
     agent_results.append(AgentResult(name="Priority Assessment", output=priority_output, duration_ms=priority_dur))
 
     total_dur = diff_dur + review_dur + summary_dur + priority_dur
@@ -271,6 +286,8 @@ def supervisor(pr_details: dict, diff: str, files: list[dict], repo: str, pr_num
     )
     pr_store.add(record)
 
+    activity_log.emit("Supervisor", "completed", f"All agents finished — {pr_type} | {priority} | Risk: {risk}", repo=repo, pr_number=pr_number, duration_ms=total_dur)
+
     # Send Teams notification
     send_teams_notification(
         repo=repo,
@@ -290,3 +307,72 @@ def supervisor(pr_details: dict, diff: str, files: list[dict], repo: str, pr_num
     )
 
     return summary_output
+
+# ---------------------------------------------------------------------------
+# Agent 5 – PR Description Generator Agent
+# ---------------------------------------------------------------------------
+
+def description_generator_agent(pr_details: dict, diff: str, files: list[dict]) -> tuple[str, int]:
+    """Generate a PR description from the diff when the author left it empty.
+    Returns (description_markdown, duration_ms)."""
+    file_summary = "\n".join(
+        f"- {f['filename']} (+{f['additions']} -{f['deletions']} | {f['status']})"
+        for f in files
+    )
+    prompt = f"""You are a PR Description Generator Agent. A developer opened a pull request
+but left the description empty. Generate a clear, professional PR description from the diff.
+
+## PR Metadata
+- Title: {pr_details.get("title", "N/A")}
+- Author: {pr_details.get("user", {}).get("login", "N/A")}
+- Branch: {pr_details.get("head", {}).get("ref", "N/A")} → {pr_details.get("base", {}).get("ref", "N/A")}
+
+## Changed Files
+{file_summary}
+
+## Raw Diff (truncated to 12 000 chars)
+{diff[:12000]}
+
+Generate a Markdown PR description with these sections:
+## Summary
+A 2-3 sentence overview of what this PR does and why.
+
+## Changes
+- Bullet list of key changes grouped by area.
+
+## Testing
+- Suggested testing steps or areas to verify.
+
+Keep it concise, factual, and developer-friendly. Do NOT include a title line — just the body content.
+End with a small note: `---\n_📝 This description was auto-generated by SynapseOps AI Agent._`"""
+
+    start = time.time()
+    result = invoke_model(prompt)
+    duration = int((time.time() - start) * 1000)
+    return result, duration
+
+
+def check_and_generate_description(pr_details: dict, diff: str, files: list[dict],
+                                    repo: str, pr_number: int) -> bool:
+    """Check if PR has an empty description and auto-generate one.
+    Returns True if a description was generated and updated."""
+    body = (pr_details.get("body") or "").strip()
+
+    if body:
+        return False
+
+    logger.info("PR #%s on %s has empty description — generating one...", pr_number, repo)
+    activity_log.emit("Description Generator", "started", "PR has empty description — generating...", repo=repo, pr_number=pr_number)
+
+    desc, duration = description_generator_agent(pr_details, diff, files)
+    update_pr_body(repo, pr_number, desc)
+    post_pr_comment(repo, pr_number,
+        "📝 **Auto-Generated Description**: This PR had an empty description, "
+        "so SynapseOps AI Agent generated one from the diff. "
+        f"_(took {duration / 1000:.1f}s)_"
+    )
+
+    activity_log.emit("Description Generator", "completed", "Description generated and updated on PR", repo=repo, pr_number=pr_number, duration_ms=duration)
+    logger.info("✅ Auto-generated description for PR #%s (%dms)", pr_number, duration)
+    return True
+

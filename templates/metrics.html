@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Metrics — SynapseOps{% endblock %}
+{% block nav_metrics %}active{% endblock %}
+
+{% block content %}
+<div class="page-title">📈 <span class="accent">Productivity</span> Metrics</div>
+
+<!-- Top-level KPIs -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">PRs Analyzed</div>
+        <div class="value">{{ m.total }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Avg Processing Time</div>
+        <div class="value">{{ "%.1f"|format(m.avg_duration_ms / 1000) }}s</div>
+        <div class="sub">vs ~15 min manual review</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Avg Time Saved / PR</div>
+        <div class="value" style="color:#3fb950;">{{ m.avg_time_saved_min }} min</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Total Time Saved</div>
+        <div class="value" style="color:#3fb950;">{{ m.total_time_saved_min }} min</div>
+        <div class="sub">{{ "%.1f"|format(m.total_time_saved_min / 60) }} hours</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Files Reviewed</div>
+        <div class="value">{{ m.total_files }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Lines Changed</div>
+        <div class="value" style="font-size:24px;">
+            <span style="color:#3fb950;">+{{ m.total_additions }}</span>
+            <span style="color:#f85149;">-{{ m.total_deletions }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Charts row 1 -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+    <div class="agent-card">
+        <div class="agent-card-header"><span class="name">📊 PRs Per Day</span></div>
+        <div class="agent-card-body" style="white-space:normal; padding:20px;">
+            <canvas id="prsPerDay" height="220"></canvas>
+        </div>
+    </div>
+    <div class="agent-card">
+        <div class="agent-card-header"><span class="name">⏱️ Avg Processing Time Per Day</span></div>
+        <div class="agent-card-body" style="white-space:normal; padding:20px;">
+            <canvas id="durationPerDay" height="220"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Charts row 2 -->
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px;">
+    <div class="agent-card">
+        <div class="agent-card-header"><span class="name">⚠️ Risk Distribution</span></div>
+        <div class="agent-card-body" style="white-space:normal; padding:20px; display:flex; justify-content:center;">
+            <canvas id="riskChart" height="220"></canvas>
+        </div>
+    </div>
+    <div class="agent-card">
+        <div class="agent-card-header"><span class="name">🏷️ PR Types</span></div>
+        <div class="agent-card-body" style="white-space:normal; padding:20px; display:flex; justify-content:center;">
+            <canvas id="typeChart" height="220"></canvas>
+        </div>
+    </div>
+    <div class="agent-card">
+        <div class="agent-card-header"><span class="name">🎯 Priority Breakdown</span></div>
+        <div class="agent-card-body" style="white-space:normal; padding:20px; display:flex; justify-content:center;">
+            <canvas id="priorityChart" height="220"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Charts row 3 -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+    <div class="agent-card">
+        <div class="agent-card-header"><span class="name">🧠 Avg Agent Processing Time</span></div>
+        <div class="agent-card-body" style="white-space:normal; padding:20px;">
+            <canvas id="agentChart" height="220"></canvas>
+        </div>
+    </div>
+    <div class="agent-card">
+        <div class="agent-card-header"><span class="name">👤 PRs by Author</span></div>
+        <div class="agent-card-body" style="white-space:normal; padding:20px;">
+            <canvas id="authorChart" height="220"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Time saved comparison -->
+<div class="agent-card">
+    <div class="agent-card-header"><span class="name">🚀 Productivity Impact</span></div>
+    <div class="agent-card-body" style="white-space:normal; padding:24px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; text-align:center;">
+            <div>
+                <div style="font-size:13px; color:#6e7681; margin-bottom:8px;">Manual Review (est.)</div>
+                <div style="font-size:36px; font-weight:800; color:#f85149;">{{ m.total * 15 }} min</div>
+                <div style="font-size:12px; color:#6e7681;">@ 15 min per PR</div>
+            </div>
+            <div>
+                <div style="font-size:13px; color:#6e7681; margin-bottom:8px;">AI Review (actual)</div>
+                <div style="font-size:36px; font-weight:800; color:#3fb950;">{{ "%.1f"|format(m.avg_duration_ms * m.total / 60000) }} min</div>
+                <div style="font-size:12px; color:#6e7681;">@ {{ "%.1f"|format(m.avg_duration_ms / 1000) }}s per PR</div>
+            </div>
+            <div>
+                <div style="font-size:13px; color:#6e7681; margin-bottom:8px;">Time Saved</div>
+                <div style="font-size:36px; font-weight:800; color:#a78bfa;">{{ "%.0f"|format(m.total_time_saved_min) }} min</div>
+                <div style="font-size:12px; color:#6e7681;">{{ "%.0f"|format((m.avg_time_saved_min / 15) * 100 if m.total > 0 else 0) }}% faster</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+const COLORS = {
+    blue: 'rgba(88,166,255,0.8)',
+    purple: 'rgba(167,139,250,0.8)',
+    green: 'rgba(63,185,80,0.8)',
+    red: 'rgba(248,81,73,0.8)',
+    yellow: 'rgba(227,179,65,0.8)',
+    grey: 'rgba(110,118,129,0.6)',
+    blueBg: 'rgba(88,166,255,0.15)',
+    purpleBg: 'rgba(167,139,250,0.15)',
+};
+const CHART_DEFAULTS = {
+    color: '#8b949e',
+    borderColor: 'rgba(255,255,255,0.05)',
+};
+Chart.defaults.color = CHART_DEFAULTS.color;
+Chart.defaults.borderColor = CHART_DEFAULTS.borderColor;
+
+// PRs per day
+const prsData = {{ m.prs_by_date | tojson }};
+new Chart(document.getElementById('prsPerDay'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(prsData),
+        datasets: [{
+            label: 'PRs',
+            data: Object.values(prsData),
+            backgroundColor: COLORS.blue,
+            borderRadius: 6,
+            borderSkipped: false,
+        }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+});
+
+// Duration per day
+const durData = {{ m.avg_duration_by_date | tojson }};
+new Chart(document.getElementById('durationPerDay'), {
+    type: 'line',
+    data: {
+        labels: Object.keys(durData),
+        datasets: [{
+            label: 'Avg ms',
+            data: Object.values(durData).map(v => (v/1000).toFixed(1)),
+            borderColor: COLORS.purple,
+            backgroundColor: COLORS.purpleBg,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: COLORS.purple,
+        }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'seconds' } } } }
+});
+
+// Risk distribution
+const riskData = {{ m.risk_counts | tojson }};
+new Chart(document.getElementById('riskChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(riskData),
+        datasets: [{
+            data: Object.values(riskData),
+            backgroundColor: [COLORS.green, COLORS.yellow, COLORS.red, COLORS.grey],
+            borderWidth: 0,
+        }]
+    },
+    options: { plugins: { legend: { position: 'bottom' } } }
+});
+
+// PR types
+const typeData = {{ m.type_counts | tojson }};
+new Chart(document.getElementById('typeChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(typeData),
+        datasets: [{
+            data: Object.values(typeData),
+            backgroundColor: [COLORS.blue, COLORS.red, COLORS.purple, COLORS.green, COLORS.yellow, COLORS.grey],
+            borderWidth: 0,
+        }]
+    },
+    options: { plugins: { legend: { position: 'bottom' } } }
+});
+
+// Priority
+const priData = {{ m.priority_counts | tojson }};
+new Chart(document.getElementById('priorityChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(priData),
+        datasets: [{
+            data: Object.values(priData),
+            backgroundColor: [COLORS.red, COLORS.red, COLORS.yellow, COLORS.green],
+            borderWidth: 0,
+        }]
+    },
+    options: { plugins: { legend: { position: 'bottom' } } }
+});
+
+// Agent durations
+const agentData = {{ m.avg_agent_durations | tojson }};
+new Chart(document.getElementById('agentChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(agentData),
+        datasets: [{
+            label: 'Avg seconds',
+            data: Object.values(agentData).map(v => (v/1000).toFixed(1)),
+            backgroundColor: [COLORS.blue, COLORS.purple, COLORS.green, COLORS.yellow],
+            borderRadius: 6,
+            borderSkipped: false,
+        }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: 'seconds' } } } }
+});
+
+// Author
+const authorData = {{ m.author_counts | tojson }};
+new Chart(document.getElementById('authorChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(authorData),
+        datasets: [{
+            label: 'PRs',
+            data: Object.values(authorData),
+            backgroundColor: COLORS.purple,
+            borderRadius: 6,
+            borderSkipped: false,
+        }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+});
+</script>
+
+<script>setTimeout(() => location.reload(), 60000);</script>
+{% endblock %}

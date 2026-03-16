@@ -1,13 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Test PR Analysis{% endblock %}
+{% block title %}Test PR Analysis — SynapseOps{% endblock %}
+{% block nav_test %}active{% endblock %}
 
 {% block content %}
-<div class="detail-header">
-    <div class="detail-title">🧪 Test PR Analysis</div>
-    <div class="detail-meta">
-        <span>Enter a GitHub repo and PR number to trigger the multi-agent pipeline manually.</span>
-    </div>
-</div>
+<div class="page-title">🧪 <span class="accent">Test PR</span> Analysis</div>
 
 <div class="agent-card">
     <div class="agent-card-header">
@@ -15,39 +11,37 @@
     </div>
     <div class="agent-card-body" style="white-space:normal;">
         <form method="POST" action="/test" id="testForm">
-            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:end;">
+            <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:end;">
                 <div>
-                    <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:4px;">Repository (owner/repo)</label>
+                    <label style="display:block; font-size:11px; color:#6e7681; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Repository (owner/repo)</label>
                     <input type="text" name="repo" placeholder="octocat/hello-world"
                         value="{{ request.form.get('repo', '') }}"
-                        style="background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 12px; border-radius:6px; font-size:14px; width:280px;">
+                        class="input" style="width:300px;">
                 </div>
                 <div>
-                    <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:4px;">PR Number</label>
+                    <label style="display:block; font-size:11px; color:#6e7681; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">PR Number</label>
                     <input type="number" name="pr_number" placeholder="1"
                         value="{{ request.form.get('pr_number', '') }}"
-                        style="background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 12px; border-radius:6px; font-size:14px; width:100px;">
+                        class="input" style="width:100px;">
                 </div>
-                <div style="display:flex; align-items:center; gap:6px;">
+                <div style="display:flex; align-items:center; gap:8px; padding-bottom:2px;">
                     <input type="checkbox" name="post_comment" id="postComment" style="accent-color:#58a6ff;">
-                    <label for="postComment" style="font-size:13px; color:#8b949e;">Post comment to GitHub</label>
+                    <label for="postComment" style="font-size:13px; color:#6e7681;">Post to GitHub</label>
                 </div>
-                <button type="submit" id="submitBtn"
-                    style="background:#238636; color:#fff; border:none; padding:8px 20px; border-radius:6px; font-size:14px; cursor:pointer; font-weight:600;">
+                <button type="submit" id="submitBtn" class="btn btn-primary">
                     🚀 Run Analysis
                 </button>
             </div>
         </form>
-        <p style="margin-top:12px; font-size:12px; color:#8b949e;">
-            This fetches the PR from GitHub, runs all 3 agents via Bedrock, and stores the result on the dashboard.
-            Check the box to also post the summary as a PR comment.
+        <p style="margin-top:14px; font-size:12px; color:#484f58;">
+            Fetches the PR, runs all agents via Bedrock, and stores the result on the dashboard.
         </p>
     </div>
 </div>
 
 {% if error %}
-<div class="agent-card" style="border-color:#f85149;">
-    <div class="agent-card-header" style="border-color:#f85149;">
+<div class="agent-card" style="border-color:rgba(248,81,73,0.3);">
+    <div class="agent-card-header" style="border-color:rgba(248,81,73,0.2);">
         <span class="name" style="color:#f85149;">❌ Error</span>
     </div>
     <div class="agent-card-body">{{ error }}</div>
@@ -55,15 +49,32 @@
 {% endif %}
 
 {% if result %}
-<div class="agent-card" style="border-color:#238636;">
-    <div class="agent-card-header" style="border-color:#238636;">
+<div class="agent-card" style="border-color:rgba(35,134,54,0.3);">
+    <div class="agent-card-header" style="border-color:rgba(35,134,54,0.2);">
         <span class="name" style="color:#3fb950;">✅ Analysis Complete</span>
         <span class="dur">
-            {% if result.posted %}📤 Posted to GitHub{% else %}📋 Not posted (checkbox was off){% endif %}
+            {% if result.desc_generated %}📝 Description auto-generated &nbsp;|&nbsp;{% endif %}
+            {% if result.posted %}📤 Posted to GitHub{% else %}📋 Not posted{% endif %}
         </span>
     </div>
     <div class="agent-card-body">{{ result.summary }}</div>
 </div>
+{% if result.conflicts %}
+<div class="agent-card" style="border-color:rgba(227,179,65,0.3); margin-top:12px;">
+    <div class="agent-card-header" style="border-color:rgba(227,179,65,0.2);">
+        <span class="name" style="color:#e3b341;">⚠️ Conflicts Detected ({{ result.conflicts|length }} PR{{ 's' if result.conflicts|length > 1 }})</span>
+    </div>
+    <div class="agent-card-body" style="white-space:normal;">
+        {% for c in result.conflicts %}
+        <div style="margin-bottom:12px; padding:10px 14px; background:rgba(227,179,65,0.06); border-radius:8px; border:1px solid rgba(227,179,65,0.12);">
+            <div style="font-weight:600; color:#e3b341; margin-bottom:4px;">PR #{{ c.other_pr }} — {{ c.other_title }}</div>
+            <div style="font-size:12px; color:#6e7681;">by {{ c.other_author }} on {{ c.other_branch }}</div>
+            <div style="font-size:13px; margin-top:6px;">{{ c.overlapping_files|length }} shared file{{ 's' if c.overlapping_files|length > 1 }}: {% for f in c.overlapping_files[:5] %}<code style="background:rgba(255,255,255,0.06); padding:1px 6px; border-radius:4px; font-size:12px;">{{ f }}</code> {% endfor %}{% if c.overlapping_files|length > 5 %}+{{ c.overlapping_files|length - 5 }} more{% endif %}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 <div style="margin-top:12px;">
     <a href="/pr/{{ result.repo }}/{{ result.pr_number }}">→ View full detail with agent breakdown</a>
 </div>
@@ -73,8 +84,7 @@
 document.getElementById('testForm').addEventListener('submit', function() {
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.textContent = '⏳ Running agents... (this takes 15-30s)';
-    btn.style.background = '#30363d';
+    btn.textContent = '⏳ Running agents... (15-30s)';
 });
 </script>
 {% endblock %}
