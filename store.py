@@ -92,8 +92,8 @@ class PRStore:
                 "total": 0, "avg_duration_ms": 0, "avg_time_saved_min": 0,
                 "total_time_saved_min": 0, "total_files": 0, "total_additions": 0,
                 "total_deletions": 0, "risk_counts": {}, "type_counts": {},
-                "priority_counts": {}, "prs_by_date": {}, "duration_by_date": {},
-                "author_counts": {}, "agent_durations": {},
+                "priority_counts": {}, "prs_by_date": {}, "avg_duration_by_date": {},
+                "author_counts": {}, "avg_agent_durations": {},
             }
 
         avg_dur = sum(r.total_duration_ms for r in records) // total

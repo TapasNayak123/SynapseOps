@@ -136,7 +136,7 @@ Chart.defaults.color = CHART_DEFAULTS.color;
 Chart.defaults.borderColor = CHART_DEFAULTS.borderColor;
 
 // PRs per day
-const prsData = {{ m.prs_by_date | tojson }};
+const prsData = {{ m.prs_by_date | default({}) | tojson }};
 new Chart(document.getElementById('prsPerDay'), {
     type: 'bar',
     data: {
@@ -153,7 +153,7 @@ new Chart(document.getElementById('prsPerDay'), {
 });
 
 // Duration per day
-const durData = {{ m.avg_duration_by_date | tojson }};
+const durData = {{ m.avg_duration_by_date | default({}) | tojson }};
 new Chart(document.getElementById('durationPerDay'), {
     type: 'line',
     data: {
@@ -173,7 +173,7 @@ new Chart(document.getElementById('durationPerDay'), {
 });
 
 // Risk distribution
-const riskData = {{ m.risk_counts | tojson }};
+const riskData = {{ m.risk_counts | default({}) | tojson }};
 new Chart(document.getElementById('riskChart'), {
     type: 'doughnut',
     data: {
@@ -188,7 +188,7 @@ new Chart(document.getElementById('riskChart'), {
 });
 
 // PR types
-const typeData = {{ m.type_counts | tojson }};
+const typeData = {{ m.type_counts | default({}) | tojson }};
 new Chart(document.getElementById('typeChart'), {
     type: 'doughnut',
     data: {
@@ -203,7 +203,7 @@ new Chart(document.getElementById('typeChart'), {
 });
 
 // Priority
-const priData = {{ m.priority_counts | tojson }};
+const priData = {{ m.priority_counts | default({}) | tojson }};
 new Chart(document.getElementById('priorityChart'), {
     type: 'doughnut',
     data: {
@@ -218,7 +218,7 @@ new Chart(document.getElementById('priorityChart'), {
 });
 
 // Agent durations
-const agentData = {{ m.avg_agent_durations | tojson }};
+const agentData = {{ m.avg_agent_durations | default({}) | tojson }};
 new Chart(document.getElementById('agentChart'), {
     type: 'bar',
     data: {
@@ -235,7 +235,7 @@ new Chart(document.getElementById('agentChart'), {
 });
 
 // Author
-const authorData = {{ m.author_counts | tojson }};
+const authorData = {{ m.author_counts | default({}) | tojson }};
 new Chart(document.getElementById('authorChart'), {
     type: 'bar',
     data: {
