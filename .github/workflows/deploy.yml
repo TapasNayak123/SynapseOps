@@ -199,12 +199,12 @@ jobs:
           
           HEALTH=$(kubectl exec $POD_NAME \
             --namespace ${{ env.HELM_NAMESPACE }} \
-            -- curl -sf http://localhost:5000/health 2>/dev/null)
+            -- python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').read().decode())")
           echo "Health: $HEALTH"
           
           READY=$(kubectl exec $POD_NAME \
             --namespace ${{ env.HELM_NAMESPACE }} \
-            -- curl -sf http://localhost:5000/health/ready 2>/dev/null)
+            -- python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health/ready').read().decode())")
           echo "Readiness: $READY"
 
       - name: Verify service endpoints
