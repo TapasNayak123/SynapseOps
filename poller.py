@@ -6,29 +6,30 @@ import logging
 import time
 import threading
 
+import requests
+
 from config import GITHUB_TOKEN
 from github_client import get_pr_details, get_pr_diff, get_pr_files, post_pr_comment
-from agents import supervisor
-from store import pr_store
-
-import requests
+from agents import supervisor, check_and_generate_description
+from conflict_detector import check_conflicts
+from activity_log import activity_log
 
 logger = logging.getLogger(__name__)
 
-GITHUB_API = "https://api.github.com"
-HEADERS = {
+_GITHUB_API = "https://api.github.com"
+_HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",
     "Accept": "application/vnd.github.v3+json",
 }
 
 # Track which PRs we've already processed (repo:pr_number:sha)
-_processed = set()
+_processed: set[str] = set()
 
 
 def get_open_prs(repo: str) -> list:
     """Fetch all open PRs for a repo."""
-    url = f"{GITHUB_API}/repos/{repo}/pulls?state=open&sort=updated&direction=desc"
-    resp = requests.get(url, headers=HEADERS, timeout=30)
+    url = f"{_GITHUB_API}/repos/{repo}/pulls?state=open&sort=updated&direction=desc"
+    resp = requests.get(url, headers=_HEADERS, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -44,11 +45,20 @@ def process_pr(repo: str, pr: dict):
 
     logger.info(">>> New/updated PR detected: %s #%s — %s", repo, pr_number, pr["title"])
     logger.info("    Head SHA: %s", head_sha)
+    activity_log.emit("Poller", "started", f"New PR detected: #{pr_number} — {pr['title']}", repo=repo, pr_number=pr_number)
 
     try:
         pr_details = get_pr_details(repo, pr_number)
         diff = get_pr_diff(repo, pr_number)
         files = get_pr_files(repo, pr_number)
+
+        # Auto-generate description if empty
+        check_and_generate_description(pr_details, diff, files, repo, pr_number)
+
+        # Conflict detection against other open PRs
+        check_conflicts(repo, pr_number, files,
+                        pr_title=pr.get("title", ""),
+                        pr_author=pr.get("user", {}).get("login", ""))
 
         logger.info("    Fetched %d changed files, running agents...", len(files))
 
