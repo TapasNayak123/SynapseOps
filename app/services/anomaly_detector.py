@@ -24,6 +24,8 @@ class AnomalyDetector:
 
         rates = [(i, float(item.get("error_rate", 0))) for i, item in enumerate(reversed(history))]
         n = len(rates)
+        if n < 2:
+            return {"api_path": api_path, "prediction": "insufficient_data", "datapoints": n}
         sx = sum(r[0] for r in rates)
         sy = sum(r[1] for r in rates)
         sxy = sum(r[0] * r[1] for r in rates)

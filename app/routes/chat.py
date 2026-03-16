@@ -1,10 +1,12 @@
 """Chat API endpoint with rate limiting."""
 from fastapi import APIRouter, HTTPException
+import structlog
 from app.models.schemas import ChatRequest, ChatResponse
 from app.services.chat_engine import ChatEngine
 from app.services.cache import CacheService
 from app.config import get_settings
 
+logger = structlog.get_logger()
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
@@ -26,4 +28,5 @@ def chat(request: ChatRequest):
         result = ChatEngine().process_message(msg, request.context)
         return ChatResponse(response=result["response"], data=result.get("data"))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("chat_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to process message")

@@ -15,13 +15,13 @@
                 <div>
                     <label style="display:block; font-size:11px; color:#6e7681; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Repository (owner/repo)</label>
                     <input type="text" name="repo" placeholder="octocat/hello-world"
-                        value="{{ request.form.get('repo', '') }}"
+                        value="{{ form_repo }}"
                         class="input" style="width:300px;">
                 </div>
                 <div>
                     <label style="display:block; font-size:11px; color:#6e7681; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">PR Number</label>
                     <input type="number" name="pr_number" placeholder="1"
-                        value="{{ request.form.get('pr_number', '') }}"
+                        value="{{ form_pr_number }}"
                         class="input" style="width:100px;">
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; padding-bottom:2px;">

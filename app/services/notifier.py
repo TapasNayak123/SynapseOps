@@ -1,5 +1,6 @@
 """Microsoft Teams notification service via Power Automate webhook."""
 import httpx
+import threading
 import structlog
 from typing import Optional
 from app.config import get_settings
@@ -13,13 +14,23 @@ ICONS = {
 }
 
 _http: Optional[httpx.Client] = None
+_http_lock = threading.Lock()
 
 
 def _get_http() -> httpx.Client:
     global _http
     if _http is None:
-        _http = httpx.Client(timeout=httpx.Timeout(10.0, connect=5.0), limits=httpx.Limits(max_connections=10))
+        with _http_lock:
+            if _http is None:
+                _http = httpx.Client(timeout=httpx.Timeout(10.0, connect=5.0), limits=httpx.Limits(max_connections=10))
     return _http
+
+
+def _reset_http() -> None:
+    """Reset HTTP client on connection errors so next call gets a fresh one."""
+    global _http
+    with _http_lock:
+        _http = None
 
 
 class NotifierService:
@@ -63,9 +74,14 @@ class NotifierService:
         }
 
         try:
-            _get_http().post(self.webhook_url, json=payload, headers={"Content-Type": "application/json"}).raise_for_status()
+            resp = _get_http().post(self.webhook_url, json=payload, headers={"Content-Type": "application/json"})
+            resp.raise_for_status()
             logger.info("teams_alert_sent", alert_type=alert_type)
             return True
+        except httpx.HTTPStatusError as e:
+            logger.error("teams_alert_http_error", status=e.response.status_code, error=str(e))
+            return False
         except Exception as e:
             logger.error("teams_alert_failed", error=str(e))
+            _reset_http()
             return False

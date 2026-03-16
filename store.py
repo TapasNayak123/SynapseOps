@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -35,45 +36,55 @@ class PRRecord:
 
 
 class PRStore:
-    """Simple in-memory store. Thread-safe enough for a POC."""
+    """Thread-safe in-memory store for PR records."""
+
+    MAX_RECORDS = 1000
 
     def __init__(self):
         self._records: list[PRRecord] = []
+        self._lock = threading.Lock()
 
     def add(self, record: PRRecord):
-        self._records.insert(0, record)  # newest first
+        with self._lock:
+            self._records.insert(0, record)
+            if len(self._records) > self.MAX_RECORDS:
+                self._records = self._records[:self.MAX_RECORDS]
 
     def all(self) -> list[PRRecord]:
-        return list(self._records)
+        with self._lock:
+            return list(self._records)
 
     def get(self, repo: str, pr_number: int) -> Optional[PRRecord]:
-        for r in self._records:
-            if r.repo == repo and r.pr_number == pr_number:
-                return r
-        return None
+        with self._lock:
+            for r in self._records:
+                if r.repo == repo and r.pr_number == pr_number:
+                    return r
+            return None
 
     def stats(self) -> dict:
-        total = len(self._records)
-        if total == 0:
-            return {"total": 0, "avg_duration_ms": 0, "risk_counts": {}, "total_files": 0}
+        with self._lock:
+            total = len(self._records)
+            if total == 0:
+                return {"total": 0, "avg_duration_ms": 0, "risk_counts": {}, "total_files": 0}
 
-        avg_dur = sum(r.total_duration_ms for r in self._records) // total
-        risk_counts = {}
-        total_files = 0
-        for r in self._records:
-            risk_counts[r.risk_level] = risk_counts.get(r.risk_level, 0) + 1
-            total_files += r.files_changed
+            avg_dur = sum(r.total_duration_ms for r in self._records) // total
+            risk_counts = {}
+            total_files = 0
+            for r in self._records:
+                risk_counts[r.risk_level] = risk_counts.get(r.risk_level, 0) + 1
+                total_files += r.files_changed
 
-        return {
-            "total": total,
-            "avg_duration_ms": avg_dur,
-            "risk_counts": risk_counts,
-            "total_files": total_files,
-        }
+            return {
+                "total": total,
+                "avg_duration_ms": avg_dur,
+                "risk_counts": risk_counts,
+                "total_files": total_files,
+            }
 
     def metrics(self) -> dict:
         """Compute detailed metrics for the metrics dashboard."""
-        records = self._records
+        with self._lock:
+            records = list(self._records)
         total = len(records)
 
         if total == 0:
@@ -175,31 +186,40 @@ class PipelineRecord:
 
 
 class PipelineStore:
-    """In-memory store for pipeline failure records."""
+    """Thread-safe in-memory store for pipeline failure records."""
+
+    MAX_RECORDS = 500
 
     def __init__(self):
         self._records: list[PipelineRecord] = []
+        self._lock = threading.Lock()
 
     def add(self, record: PipelineRecord):
-        self._records.insert(0, record)
+        with self._lock:
+            self._records.insert(0, record)
+            if len(self._records) > self.MAX_RECORDS:
+                self._records = self._records[:self.MAX_RECORDS]
 
     def all(self) -> list[PipelineRecord]:
-        return list(self._records)
+        with self._lock:
+            return list(self._records)
 
     def get(self, repo: str, run_id: int) -> Optional[PipelineRecord]:
-        for r in self._records:
-            if r.repo == repo and r.run_id == run_id:
-                return r
-        return None
+        with self._lock:
+            for r in self._records:
+                if r.repo == repo and r.run_id == run_id:
+                    return r
+            return None
 
     def stats(self) -> dict:
-        total = len(self._records)
-        if total == 0:
-            return {"total": 0, "repos": {}}
-        repos = {}
-        for r in self._records:
-            repos[r.repo] = repos.get(r.repo, 0) + 1
-        return {"total": total, "repos": repos}
+        with self._lock:
+            total = len(self._records)
+            if total == 0:
+                return {"total": 0, "repos": {}}
+            repos = {}
+            for r in self._records:
+                repos[r.repo] = repos.get(r.repo, 0) + 1
+            return {"total": total, "repos": repos}
 
 
 pipeline_store = PipelineStore()

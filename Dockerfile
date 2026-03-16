@@ -8,11 +8,15 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy all application code
 COPY app/ ./app/
+COPY templates/ ./templates/
+COPY *.py ./
+COPY .env.example ./.env.example
 
 # Switch to non-root user
 USER appuser
 
-EXPOSE 8000
+EXPOSE 5000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]

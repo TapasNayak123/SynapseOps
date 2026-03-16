@@ -1,9 +1,9 @@
 """GitHub Actions deployment tracking and error correlation."""
-import httpx
 import structlog
 from datetime import datetime, timedelta
 from app.config import get_settings
 from app.services.dynamodb import DynamoDBService
+from github_client import gh_headers, GITHUB_API, _get_session
 
 logger = structlog.get_logger()
 
@@ -18,18 +18,18 @@ class DeploymentTracker:
             return []
 
         try:
-            with httpx.Client(timeout=15) as client:
-                resp = client.get(
-                    f"https://api.github.com/repos/{self.settings.github_repo}/actions/runs",
-                    headers={"Authorization": f"Bearer {self.settings.github_token}",
-                             "Accept": "application/vnd.github.v3+json"},
-                    params={"status": "completed", "per_page": 20},
-                )
-                resp.raise_for_status()
+            resp = _get_session().get(
+                f"{GITHUB_API}/repos/{self.settings.github_repo}/actions/runs",
+                headers=gh_headers(),
+                params={"status": "completed", "per_page": 20},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
             cutoff = datetime.utcnow() - timedelta(hours=hours_back)
             deployments = []
-            for run in resp.json().get("workflow_runs", []):
+            for run in data.get("workflow_runs", []):
                 created = datetime.fromisoformat(run["created_at"].replace("Z", "+00:00")).replace(tzinfo=None)
                 if created < cutoff:
                     continue

@@ -41,7 +41,12 @@ Intents: top_apis, slowest_apis, api_history, correlation_trace, error_analysis,
 User: "{sanitized}"
 JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_code": null, "start_hour": null, "end_hour": null, "hours_back": 1}}"""
         try:
-            return json.loads(self.llm.invoke(prompt, max_tokens=256))
+            text = self.llm.invoke(prompt, max_tokens=256).strip()
+            # Strip markdown code fences if present
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1]
+                text = text.rsplit("```", 1)[0].strip()
+            return json.loads(text)
         except Exception:
             return {"intent": "general"}
 

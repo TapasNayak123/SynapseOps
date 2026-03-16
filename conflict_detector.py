@@ -4,25 +4,18 @@ from __future__ import annotations
 
 import logging
 
-import requests
-
-from config import GITHUB_TOKEN, TEAMS_WEBHOOK_URL, APP_BASE_URL
-from github_client import get_pr_files, post_pr_comment
+from config import TEAMS_WEBHOOK_URL, APP_BASE_URL
+from github_client import get_pr_files, post_pr_comment, gh_headers, GITHUB_API, _get_session
 from activity_log import activity_log
+from app.services.notifier import _get_http
 
 logger = logging.getLogger(__name__)
-
-_GITHUB_API = "https://api.github.com"
-_HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json",
-}
 
 
 def _get_open_prs(repo: str) -> list[dict]:
     """Fetch all open PRs (lightweight list)."""
-    url = f"{_GITHUB_API}/repos/{repo}/pulls?state=open&per_page=50"
-    resp = requests.get(url, headers=_HEADERS, timeout=30)
+    url = f"{GITHUB_API}/repos/{repo}/pulls?state=open&per_page=50"
+    resp = _get_session().get(url, headers=gh_headers(), timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -167,11 +160,10 @@ def _send_conflict_teams_notification(
     }
 
     try:
-        resp = requests.post(
+        resp = _get_http().post(
             TEAMS_WEBHOOK_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=30,
         )
         resp.raise_for_status()
         logger.info("✅ Conflict notification sent for PR #%s", pr_number)

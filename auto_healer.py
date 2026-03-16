@@ -9,25 +9,19 @@ import logging
 from bedrock_client import invoke_model
 from github_client import (
     get_file_content, update_file, create_file,
-    post_pr_comment, rerun_workflow,
+    post_pr_comment, rerun_workflow, gh_headers,
+    GITHUB_API, _get_session,
 )
-from config import GITHUB_TOKEN, TEAMS_WEBHOOK_URL, APP_BASE_URL
-
-import requests
+from config import TEAMS_WEBHOOK_URL, APP_BASE_URL
+from app.services.notifier import _get_http
 
 logger = logging.getLogger(__name__)
-
-_GITHUB_API = "https://api.github.com"
-_HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json",
-}
 
 
 def find_pr_for_branch(repo: str, branch: str) -> dict | None:
     """Find an open PR associated with a branch."""
-    url = f"{_GITHUB_API}/repos/{repo}/pulls?state=open&head={repo.split('/')[0]}:{branch}"
-    resp = requests.get(url, headers=_HEADERS, timeout=30)
+    url = f"{GITHUB_API}/repos/{repo}/pulls?state=open&head={repo.split('/')[0]}:{branch}"
+    resp = _get_session().get(url, headers=gh_headers(), timeout=30)
     if resp.status_code == 200:
         prs = resp.json()
         if prs:
@@ -268,11 +262,10 @@ def send_autoheal_notification(repo: str, run: dict, fix: dict, result: dict):
     })
 
     try:
-        resp = requests.post(
+        resp = _get_http().post(
             TEAMS_WEBHOOK_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=30,
         )
         resp.raise_for_status()
         logger.info("✅ Auto-heal notification sent")

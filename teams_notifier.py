@@ -1,10 +1,13 @@
-"""Send PR summary notifications to Microsoft Teams via webhook (Workflows)."""
+"""Send PR summary notifications to Microsoft Teams via webhook (Workflows).
+
+Uses the shared httpx client from app.services.notifier for connection pooling.
+"""
 
 from __future__ import annotations
 
 import logging
-import requests
 from config import TEAMS_WEBHOOK_URL, APP_BASE_URL
+from app.services.notifier import _get_http
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,6 @@ def send_teams_notification(
     pr_url = f"https://github.com/{repo}/pull/{pr_number}"
     risk_emoji = {"Low": "🟢", "Medium": "🟡", "High": "🔴"}.get(risk_level, "⚪")
 
-    # Build approval/reject URLs
     approve_url = f"{APP_BASE_URL}/action/approve/{repo}/{pr_number}"
     reject_url = f"{APP_BASE_URL}/action/reject/{repo}/{pr_number}"
 
@@ -136,11 +138,10 @@ def send_teams_notification(
     }
 
     try:
-        resp = requests.post(
+        resp = _get_http().post(
             TEAMS_WEBHOOK_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=30,
         )
         resp.raise_for_status()
         logger.info("✅ Teams notification sent for PR #%s", pr_number)

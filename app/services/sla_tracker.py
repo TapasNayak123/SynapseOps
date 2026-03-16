@@ -27,8 +27,9 @@ class SLATracker:
 
     def check_sla_compliance(self, api_path: str, hours_back: int = 24) -> dict:
         targets = self.get_sla_targets(api_path)
-        metrics = self.cw.get_api_metrics(api_path, period_minutes=hours_back * 60)
-        latency = self.cw.get_latency_metrics(api_path, period_minutes=hours_back * 60)
+        period_minutes = min(hours_back * 60, 1440)  # Cap at 24h for performance
+        metrics = self.cw.get_api_metrics(api_path, period_minutes=period_minutes)
+        latency = self.cw.get_latency_metrics(api_path, period_minutes=period_minutes)
 
         er = metrics.get("error_rate", 0)
         p99 = latency.get("p99_latency_ms", 0)

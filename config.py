@@ -1,19 +1,18 @@
-import os
-from dotenv import load_dotenv
+"""Root config — re-exports settings from app.config (single source of truth).
 
-load_dotenv()
+Modules that do `from config import GITHUB_TOKEN` continue to work unchanged.
+"""
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-pro-v1:0")
+from app.config import get_settings as _get_settings
 
-# Comma-separated list of repos to watch, e.g. "owner/repo1,owner/repo2"
-WATCH_REPOS = [r.strip() for r in os.getenv("WATCH_REPOS", "").split(",") if r.strip()]
-POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "60"))
+_s = _get_settings()
 
-# Microsoft Teams incoming webhook URL
-TEAMS_WEBHOOK_URL = os.getenv("TEAMS_WEBHOOK_URL", "")
-
-# Base URL of this app (for Teams action buttons)
-APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5000")
+GITHUB_TOKEN = _s.github_token
+GITHUB_WEBHOOK_SECRET = _s.github_webhook_secret
+AWS_REGION = _s.aws_region
+BEDROCK_MODEL_ID = _s.bedrock_model_id
+TEAMS_WEBHOOK_URL = _s.teams_webhook_url
+APP_BASE_URL = _s.app_base_url
+GITHUB_REPO = _s.github_repo
+GITHUB_REPOS = _s.github_repos_list
+POLL_INTERVAL = _s.poll_interval

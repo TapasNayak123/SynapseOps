@@ -6,46 +6,41 @@ import logging
 import time
 import threading
 
-import requests
-
-from config import GITHUB_TOKEN, TEAMS_WEBHOOK_URL, APP_BASE_URL
+from config import TEAMS_WEBHOOK_URL, APP_BASE_URL
 from bedrock_client import invoke_model
+from github_client import gh_headers, GITHUB_API, _get_session
 from store import PipelineRecord, pipeline_store
 from auto_healer import generate_fix, apply_fix, send_autoheal_notification
 from activity_log import activity_log
+from app.services.notifier import _get_http
 
 logger = logging.getLogger(__name__)
 
-_GITHUB_API = "https://api.github.com"
-_HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json",
-}
-
 # Track which workflow runs we've already analyzed
 _analyzed_runs: set[str] = set()
+_MAX_ANALYZED = 5000
 
 
 def get_workflow_runs(repo: str, status: str = "failure") -> list:
     """Fetch recent failed workflow runs."""
-    url = f"{_GITHUB_API}/repos/{repo}/actions/runs?status={status}&per_page=10"
-    resp = requests.get(url, headers=_HEADERS, timeout=30)
+    url = f"{GITHUB_API}/repos/{repo}/actions/runs?status={status}&per_page=10"
+    resp = _get_session().get(url, headers=gh_headers(), timeout=30)
     resp.raise_for_status()
     return resp.json().get("workflow_runs", [])
 
 
 def get_run_jobs(repo: str, run_id: int) -> list:
     """Fetch jobs for a workflow run."""
-    url = f"{_GITHUB_API}/repos/{repo}/actions/runs/{run_id}/jobs"
-    resp = requests.get(url, headers=_HEADERS, timeout=30)
+    url = f"{GITHUB_API}/repos/{repo}/actions/runs/{run_id}/jobs"
+    resp = _get_session().get(url, headers=gh_headers(), timeout=30)
     resp.raise_for_status()
     return resp.json().get("jobs", [])
 
 
 def get_job_logs(repo: str, job_id: int) -> str:
     """Fetch logs for a specific job."""
-    url = f"{_GITHUB_API}/repos/{repo}/actions/jobs/{job_id}/logs"
-    resp = requests.get(url, headers=_HEADERS, timeout=60, allow_redirects=True)
+    url = f"{GITHUB_API}/repos/{repo}/actions/jobs/{job_id}/logs"
+    resp = _get_session().get(url, headers=gh_headers(), timeout=60, allow_redirects=True)
     if resp.status_code == 200:
         return resp.text
     return f"(Could not fetch logs — status {resp.status_code})"
@@ -186,11 +181,10 @@ def send_pipeline_failure_notification(
     }
 
     try:
-        resp = requests.post(
+        resp = _get_http().post(
             TEAMS_WEBHOOK_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=30,
         )
         resp.raise_for_status()
         logger.info("✅ Pipeline failure notification sent for run %s", run.get("id"))
@@ -268,6 +262,10 @@ def process_failed_run(repo: str, run: dict):
             send_autoheal_notification(repo, run, fix, {"pr_url": "", "files_changed": []})
 
         _analyzed_runs.add(key)
+        # Prevent unbounded memory growth
+        if len(_analyzed_runs) > _MAX_ANALYZED:
+            to_remove = list(_analyzed_runs)[:_MAX_ANALYZED // 2]
+            _analyzed_runs.difference_update(to_remove)
 
     except Exception:
         logger.exception("    ❌ Failed to process pipeline run %s", run_id)

@@ -6,30 +6,26 @@ import logging
 import time
 import threading
 
-import requests
-
-from config import GITHUB_TOKEN
-from github_client import get_pr_details, get_pr_diff, get_pr_files, post_pr_comment
+from github_client import (
+    get_pr_details, get_pr_diff, get_pr_files, post_pr_comment,
+    gh_headers, GITHUB_API, _get_session,
+)
 from agents import supervisor, check_and_generate_description
 from conflict_detector import check_conflicts
 from activity_log import activity_log
 
 logger = logging.getLogger(__name__)
 
-_GITHUB_API = "https://api.github.com"
-_HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json",
-}
-
 # Track which PRs we've already processed (repo:pr_number:sha)
+# Use an LRU-style bounded set to prevent unbounded memory growth
 _processed: set[str] = set()
+_MAX_PROCESSED = 5000
 
 
 def get_open_prs(repo: str) -> list:
     """Fetch all open PRs for a repo."""
-    url = f"{_GITHUB_API}/repos/{repo}/pulls?state=open&sort=updated&direction=desc"
-    resp = requests.get(url, headers=_HEADERS, timeout=30)
+    url = f"{GITHUB_API}/repos/{repo}/pulls?state=open&sort=updated&direction=desc"
+    resp = _get_session().get(url, headers=gh_headers(), timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -68,6 +64,11 @@ def process_pr(repo: str, pr: dict):
         logger.info("    ✅ Posted AI summary on PR #%s", pr_number)
 
         _processed.add(key)
+        # Prevent unbounded memory growth
+        if len(_processed) > _MAX_PROCESSED:
+            # Remove oldest half
+            to_remove = list(_processed)[:_MAX_PROCESSED // 2]
+            _processed.difference_update(to_remove)
         return True
 
     except Exception:

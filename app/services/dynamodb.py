@@ -1,5 +1,6 @@
 """DynamoDB service with singleton resource and retry configuration."""
 import boto3
+import threading
 import structlog
 from datetime import datetime
 from decimal import Decimal
@@ -9,16 +10,19 @@ from app.config import get_settings
 logger = structlog.get_logger()
 
 _resource = None
+_resource_lock = threading.Lock()
 
 
 def _get_resource():
     global _resource
     if _resource is None:
-        settings = get_settings()
-        _resource = boto3.resource(
-            "dynamodb", region_name=settings.aws_region,
-            config=BotoConfig(retries={"max_attempts": 3, "mode": "adaptive"}, max_pool_connections=25),
-        )
+        with _resource_lock:
+            if _resource is None:
+                settings = get_settings()
+                _resource = boto3.resource(
+                    "dynamodb", region_name=settings.aws_region,
+                    config=BotoConfig(retries={"max_attempts": 3, "mode": "adaptive"}, max_pool_connections=25),
+                )
     return _resource
 
 
@@ -53,7 +57,8 @@ class DynamoDBService:
     def store_metric_snapshot(self, metric: dict) -> None:
         try:
             item = self._decimalize(metric)
-            item["pk"] = f"METRIC#{metric['api_path']}"
+            api_path = metric.get("api_path", "unknown")
+            item["pk"] = f"METRIC#{api_path}"
             item["sk"] = datetime.utcnow().isoformat()
             self.metrics_table.put_item(Item=item)
         except Exception as e:

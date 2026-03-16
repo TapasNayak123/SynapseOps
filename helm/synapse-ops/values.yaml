@@ -7,7 +7,7 @@ image:
 
 service:
   type: ClusterIP
-  port: 8000
+  port: 5000
 
 resources:
   requests:
@@ -31,13 +31,19 @@ env:
   BEDROCK_REGION: us-east-1
   ERROR_RATE_THRESHOLD: "50.0"
   SLOW_API_THRESHOLD_MS: "2000"
+  MONITORING_INTERVAL_SECONDS: "60"
+  ALERT_COOLDOWN_MINUTES: "60"
+  CHAT_RATE_LIMIT_PER_MINUTE: "30"
+  POLL_INTERVAL: "60"
+  APP_BASE_URL: "http://synapse-ops:5000"
 
 secrets:
   TEAMS_WEBHOOK_URL: ""
   GITHUB_TOKEN: ""
+  GITHUB_WEBHOOK_SECRET: ""
 
 serviceAccount:
-  create: true
+  create: false
   name: synapse-ops-sa
   annotations:
     eks.amazonaws.com/role-arn: arn:aws:iam::551494044780:role/synapse-ops-role

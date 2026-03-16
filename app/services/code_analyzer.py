@@ -1,10 +1,10 @@
 """Node.js error categorization and GitHub source code fetching."""
 import re
-import httpx
 import base64
 import structlog
 from enum import Enum
 from app.config import get_settings
+from github_client import get_file_content as _gh_get_file
 
 logger = structlog.get_logger()
 
@@ -77,19 +77,9 @@ class CodeAnalyzer:
         if not self.settings.github_token or not self.settings.github_repo:
             return None
         try:
-            with httpx.Client(timeout=15) as client:
-                resp = client.get(
-                    f"https://api.github.com/repos/{self.settings.github_repo}/contents/{file_path}",
-                    headers={"Authorization": f"Bearer {self.settings.github_token}",
-                             "Accept": "application/vnd.github.v3+json"},
-                    params={"ref": branch},
-                )
-                if resp.status_code == 404:
-                    return None
-                resp.raise_for_status()
-            data = resp.json()
+            data = _gh_get_file(self.settings.github_repo, file_path, branch)
             return {"path": file_path, "content": base64.b64decode(data["content"]).decode("utf-8"),
-                    "sha": data["sha"], "url": data["html_url"]}
+                    "sha": data["sha"], "url": data.get("html_url", "")}
         except Exception as e:
             logger.error("github_fetch_failed", path=file_path, error=str(e))
             return None

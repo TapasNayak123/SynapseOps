@@ -1,6 +1,7 @@
 """CloudWatch Logs Insights service for querying application logs."""
 import re
 import time
+import threading
 import boto3
 import structlog
 from datetime import datetime, timedelta
@@ -23,17 +24,20 @@ F_RESPONSE_FILTER = f'({F_MESSAGE} = "Request completed" or {F_MESSAGE} = "Error
 
 # Singleton client
 _client = None
+_client_lock = threading.Lock()
 
 
 def _get_client():
     global _client
     if _client is None:
-        settings = get_settings()
-        _client = boto3.client(
-            "logs",
-            region_name=settings.aws_region,
-            config=BotoConfig(retries={"max_attempts": 3, "mode": "adaptive"}, connect_timeout=5, read_timeout=30),
-        )
+        with _client_lock:
+            if _client is None:
+                settings = get_settings()
+                _client = boto3.client(
+                    "logs",
+                    region_name=settings.aws_region,
+                    config=BotoConfig(retries={"max_attempts": 3, "mode": "adaptive"}, connect_timeout=5, read_timeout=30),
+                )
     return _client
 
 
@@ -56,7 +60,7 @@ class CloudWatchService:
                 startTime=int(start.timestamp()),
                 endTime=int(end.timestamp()),
                 queryString=query,
-                limit=limit,
+                limit=min(limit, 10000),  # CloudWatch max is 10000
             )
             qid = resp["queryId"]
             # Poll with timeout to prevent infinite hang

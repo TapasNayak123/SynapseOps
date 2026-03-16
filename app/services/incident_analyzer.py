@@ -46,22 +46,31 @@ class IncidentAnalyzer:
                 "slow_request_count": len(slow), "timeline": events}
 
     def compare_periods(self, api_path: str, p1_hours: int = 24, p2_hours: int = 48) -> dict:
+        """Compare current period vs previous period of equal length."""
+        # Current period: last p1_hours
         m1 = self.cw.get_api_metrics(api_path, period_minutes=p1_hours * 60)
         l1 = self.cw.get_latency_metrics(api_path, period_minutes=p1_hours * 60)
+        # Previous period: p1_hours before that (total lookback = p2_hours)
         m2 = self.cw.get_api_metrics(api_path, period_minutes=p2_hours * 60)
         l2 = self.cw.get_latency_metrics(api_path, period_minutes=p2_hours * 60)
+
+        # Approximate the previous-only period by subtracting current from total
+        prev_total = max(0, m2["total_requests"] - m1["total_requests"])
+        prev_errors = max(0, m2.get("error_count", 0) - m1.get("error_count", 0))
+        prev_error_rate = (prev_errors / prev_total * 100) if prev_total else 0.0
+        prev_avg_latency = l2["avg_latency_ms"]  # approximation
 
         def pct(new, old):
             return round(((new - old) / old) * 100, 1) if old else 0
 
         return {"api_path": api_path, "period1": f"last {p1_hours}h", "period2": f"previous {p2_hours - p1_hours}h",
                 "comparison": {
-                    "error_rate": {"current": m1["error_rate"], "previous": m2["error_rate"],
-                                   "change_pct": pct(m1["error_rate"], m2["error_rate"])},
-                    "avg_latency_ms": {"current": l1["avg_latency_ms"], "previous": l2["avg_latency_ms"],
-                                       "change_pct": pct(l1["avg_latency_ms"], l2["avg_latency_ms"])},
-                    "total_requests": {"current": m1["total_requests"], "previous": m2["total_requests"],
-                                       "change_pct": pct(m1["total_requests"], m2["total_requests"])},
+                    "error_rate": {"current": m1["error_rate"], "previous": round(prev_error_rate, 2),
+                                   "change_pct": pct(m1["error_rate"], prev_error_rate)},
+                    "avg_latency_ms": {"current": l1["avg_latency_ms"], "previous": prev_avg_latency,
+                                       "change_pct": pct(l1["avg_latency_ms"], prev_avg_latency)},
+                    "total_requests": {"current": m1["total_requests"], "previous": prev_total,
+                                       "change_pct": pct(m1["total_requests"], prev_total)},
                 }}
 
     def detect_recurring_errors(self, hours_back: int = 168) -> list[dict]:
