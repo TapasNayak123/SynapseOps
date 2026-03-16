@@ -20,7 +20,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - containerPort: {{ .Values.service.targetPort }}
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
@@ -38,14 +38,14 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.service.port }}
+              port: {{ .Values.service.targetPort }}
             initialDelaySeconds: 20
             periodSeconds: 30
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: {{ .Values.service.port }}
+              port: {{ .Values.service.targetPort }}
             initialDelaySeconds: 10
             periodSeconds: 10
             failureThreshold: 3
