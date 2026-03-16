@@ -1,0 +1,292 @@
+"""Multi-agent system: Diff Analyst, Code Reviewer, and Summary Generator.
+
+Each agent is a specialized prompt sent to Amazon Bedrock.
+The Supervisor orchestrates them in sequence and records results.
+"""
+
+from __future__ import annotations
+
+import re
+import time
+
+from bedrock_client import invoke_model
+from store import AgentResult, PRRecord, pr_store
+from teams_notifier import send_teams_notification
+
+
+# ---------------------------------------------------------------------------
+# Agent 1 – Diff Analysis Agent
+# ---------------------------------------------------------------------------
+
+def diff_analysis_agent(diff: str, files: list[dict]) -> tuple[str, int]:
+    """Analyze the diff and categorize changes. Returns (output, duration_ms)."""
+    file_summary = "\n".join(
+        f"- {f['filename']} (+{f['additions']} -{f['deletions']} | {f['status']})"
+        for f in files
+    )
+    prompt = f"""You are a Diff Analysis Agent. Your job is to analyze a pull request diff
+and produce a structured breakdown.
+
+## Changed Files
+{file_summary}
+
+## Raw Diff (truncated to 12 000 chars)
+{diff[:12000]}
+
+Produce the following:
+1. **Change Category**: Is this a feature, bugfix, refactor, docs update, config change, or mixed?
+2. **Files Changed Summary**: Group files by area (e.g., backend, frontend, tests, config).
+3. **Key Modifications**: List the most important code changes (max 10 bullet points).
+4. **Risk Assessment**: Low / Medium / High — with a one-line justification.
+
+Be concise and factual."""
+
+    start = time.time()
+    result = invoke_model(prompt)
+    duration = int((time.time() - start) * 1000)
+    return result, duration
+
+
+# ---------------------------------------------------------------------------
+# Agent 2 – Code Review Agent
+# ---------------------------------------------------------------------------
+
+def code_review_agent(diff: str) -> tuple[str, int]:
+    """Review code quality, security, and best practices. Returns (output, duration_ms)."""
+    prompt = f"""You are a Code Review Agent. Analyze the following pull request diff for:
+
+1. **Code Quality Issues**: naming, complexity, duplication
+2. **Security Concerns**: hardcoded secrets, injection risks, auth gaps
+3. **Best Practice Violations**: error handling, logging, typing
+4. **Positive Highlights**: well-written code worth calling out
+
+## Diff (truncated to 12 000 chars)
+{diff[:12000]}
+
+Keep feedback actionable. Use bullet points. Max 15 items total."""
+
+    start = time.time()
+    result = invoke_model(prompt)
+    duration = int((time.time() - start) * 1000)
+    return result, duration
+
+
+# ---------------------------------------------------------------------------
+# Agent 3 – Summary Generator Agent
+# ---------------------------------------------------------------------------
+
+def summary_generator_agent(
+    pr_details: dict,
+    diff_analysis: str,
+    code_review: str,
+) -> tuple[str, int]:
+    """Generate a human-readable MR summary. Returns (output, duration_ms)."""
+    prompt = f"""You are a Summary Generator Agent. Combine the inputs below into a
+polished pull request summary that a developer can read in under 2 minutes.
+
+## PR Metadata
+- **Title**: {pr_details.get("title", "N/A")}
+- **Author**: {pr_details.get("user", {}).get("login", "N/A")}
+- **Branch**: {pr_details.get("head", {}).get("ref", "N/A")} → {pr_details.get("base", {}).get("ref", "N/A")}
+- **Description**: {(pr_details.get("body") or "No description provided.")[:2000]}
+
+## Diff Analysis (from Diff Agent)
+{diff_analysis}
+
+## Code Review (from Review Agent)
+{code_review}
+
+Produce a Markdown comment with these sections:
+1. 🔍 **Overview** — 2-3 sentence summary of what this PR does.
+2. 📂 **Changes Breakdown** — grouped by area.
+3. ⚠️ **Review Highlights** — top issues or praise from the code review.
+4. 📊 **Risk Level** — Low / Medium / High with reasoning.
+5. ✅ **Recommendation** — Approve, Request Changes, or Needs Discussion.
+
+Start the comment with: `## 🤖 AI-Generated PR Summary`"""
+
+    start = time.time()
+    result = invoke_model(prompt)
+    duration = int((time.time() - start) * 1000)
+    return result, duration
+
+
+def _extract_risk_level(summary: str) -> str:
+    """Extract risk level from the generated summary."""
+    text = summary.lower()
+    if "risk level" in text:
+        after = text.split("risk level")[-1][:100]
+        if "high" in after:
+            return "High"
+        if "medium" in after:
+            return "Medium"
+        if "low" in after:
+            return "Low"
+    return "Unknown"
+
+
+def _extract_pr_type(diff_analysis: str) -> str:
+    """Extract PR type (feature, bugfix, refactor, etc.) from diff analysis output."""
+    text = diff_analysis.lower()
+
+    # Look for the change category section
+    for marker in ["change category", "category"]:
+        if marker in text:
+            after = text.split(marker)[-1][:200]
+            if "bugfix" in after or "bug fix" in after or "bug" in after:
+                return "🐛 Bugfix"
+            if "feature" in after or "new feature" in after:
+                return "✨ Feature"
+            if "refactor" in after:
+                return "♻️ Refactor"
+            if "docs" in after or "documentation" in after:
+                return "📝 Docs"
+            if "config" in after or "configuration" in after:
+                return "⚙️ Config"
+            if "test" in after:
+                return "🧪 Test"
+            if "mixed" in after:
+                return "🔀 Mixed"
+            break
+
+    # Fallback: scan the whole text
+    if "bugfix" in text or "bug fix" in text or "fixes bug" in text:
+        return "🐛 Bugfix"
+    if "feature" in text or "new functionality" in text:
+        return "✨ Feature"
+    if "refactor" in text:
+        return "♻️ Refactor"
+
+    return "❓ Unknown"
+
+
+# ---------------------------------------------------------------------------
+# Agent 4 – Priority Assessment Agent
+# ---------------------------------------------------------------------------
+
+def priority_agent(
+    pr_details: dict,
+    diff_analysis: str,
+    files: list[dict],
+) -> tuple[str, int]:
+    """Assess PR priority based on code changes and context. Returns (output, duration_ms)."""
+    file_list = ", ".join(f["filename"] for f in files[:20])
+    total_changes = sum(f.get("additions", 0) + f.get("deletions", 0) for f in files)
+
+    prompt = f"""You are a Priority Assessment Agent. Determine the priority of this pull request.
+
+## PR Info
+- Title: {pr_details.get("title", "N/A")}
+- Description: {(pr_details.get("body") or "None")[:1000]}
+- Branch: {pr_details.get("head", {}).get("ref", "N/A")}
+- Files changed: {len(files)} ({total_changes} total line changes)
+- Files: {file_list}
+
+## Diff Analysis
+{diff_analysis[:3000]}
+
+Assess priority as one of: Critical, High, Medium, Low
+
+Use these criteria:
+- **Critical**: Security fixes, production hotfixes, data loss prevention, breaking changes that block others
+- **High**: Bug fixes affecting users, important features with deadlines, changes to auth/payment/core logic
+- **Medium**: Standard features, non-urgent improvements, moderate refactors
+- **Low**: Documentation, minor style changes, test-only changes, config tweaks
+
+Respond in EXACTLY this format (first line must be the priority):
+PRIORITY: <Critical|High|Medium|Low>
+REASON: <one sentence explanation>"""
+
+    start = time.time()
+    result = invoke_model(prompt, max_tokens=200)
+    duration = int((time.time() - start) * 1000)
+    return result, duration
+
+
+def _extract_priority(priority_output: str) -> str:
+    """Extract priority level from priority agent output."""
+    text = priority_output.lower()
+    for line in text.split("\n"):
+        if "priority" in line:
+            if "critical" in line:
+                return "🔥 Critical"
+            if "high" in line:
+                return "🔴 High"
+            if "medium" in line:
+                return "🟡 Medium"
+            if "low" in line:
+                return "🟢 Low"
+    return "🟡 Medium"
+
+
+# ---------------------------------------------------------------------------
+# Supervisor – Orchestrates the agents
+# ---------------------------------------------------------------------------
+
+def supervisor(pr_details: dict, diff: str, files: list[dict], repo: str, pr_number: int) -> str:
+    """Run all agents in sequence, store results, and return the final summary."""
+    agent_results = []
+
+    # Step 1: Diff Analysis
+    diff_output, diff_dur = diff_analysis_agent(diff, files)
+    agent_results.append(AgentResult(name="Diff Analysis", output=diff_output, duration_ms=diff_dur))
+
+    # Step 2: Code Review
+    review_output, review_dur = code_review_agent(diff)
+    agent_results.append(AgentResult(name="Code Review", output=review_output, duration_ms=review_dur))
+
+    # Step 3: Generate Summary
+    summary_output, summary_dur = summary_generator_agent(pr_details, diff_output, review_output)
+    agent_results.append(AgentResult(name="Summary Generator", output=summary_output, duration_ms=summary_dur))
+
+    # Step 4: Priority Assessment
+    priority_output, priority_dur = priority_agent(pr_details, diff_output, files)
+    agent_results.append(AgentResult(name="Priority Assessment", output=priority_output, duration_ms=priority_dur))
+
+    total_dur = diff_dur + review_dur + summary_dur + priority_dur
+    risk = _extract_risk_level(summary_output)
+    pr_type = _extract_pr_type(diff_output)
+    priority = _extract_priority(priority_output)
+
+    total_additions = sum(f.get("additions", 0) for f in files)
+    total_deletions = sum(f.get("deletions", 0) for f in files)
+
+    record = PRRecord(
+        repo=repo,
+        pr_number=pr_number,
+        title=pr_details.get("title", "N/A"),
+        author=pr_details.get("user", {}).get("login", "N/A"),
+        branch=pr_details.get("head", {}).get("ref", "N/A"),
+        target=pr_details.get("base", {}).get("ref", "N/A"),
+        action="summary",
+        summary=summary_output,
+        risk_level=risk,
+        pr_type=pr_type,
+        priority=priority,
+        agent_results=agent_results,
+        total_duration_ms=total_dur,
+        files_changed=len(files),
+        additions=total_additions,
+        deletions=total_deletions,
+    )
+    pr_store.add(record)
+
+    # Send Teams notification
+    send_teams_notification(
+        repo=repo,
+        pr_number=pr_number,
+        title=record.title,
+        author=record.author,
+        branch=record.branch,
+        target=record.target,
+        risk_level=risk,
+        pr_type=pr_type,
+        priority=priority,
+        summary=summary_output,
+        files_changed=len(files),
+        additions=total_additions,
+        deletions=total_deletions,
+        duration_ms=total_dur,
+    )
+
+    return summary_output

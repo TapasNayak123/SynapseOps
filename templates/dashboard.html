@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — PR Summary Agent{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">PRs Processed</div>
+        <div class="value">{{ stats.total }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Avg Processing Time</div>
+        <div class="value">{{ "%.1f"|format(stats.avg_duration_ms / 1000) }}s</div>
+        <div class="sub">across all agents</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Files Reviewed</div>
+        <div class="value">{{ stats.total_files }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Risk Distribution</div>
+        <div class="value" style="font-size:16px; margin-top:8px;">
+            {% for level, count in stats.risk_counts.items() %}
+                <span class="badge badge-{{ level|lower }}">{{ level }}: {{ count }}</span>
+            {% endfor %}
+            {% if not stats.risk_counts %}
+                <span style="color:#8b949e">—</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- PR Table -->
+<div class="table-wrap">
+    <div class="table-header">Recent Pull Requests</div>
+    {% if records %}
+    <table>
+        <thead>
+            <tr>
+                <th>PR</th>
+                <th>Repository</th>
+                <th>Type</th>
+                <th>Priority</th>
+                <th>Author</th>
+                <th>Files</th>
+                <th>Risk</th>
+                <th>Duration</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td>
+                    <a href="/pr/{{ r.repo }}/{{ r.pr_number }}">#{{ r.pr_number }} — {{ r.title }}</a>
+                </td>
+                <td>{{ r.repo }}</td>
+                <td>{{ r.pr_type }}</td>
+                <td>{{ r.priority }}</td>
+                <td>{{ r.author }}</td>
+                <td>{{ r.files_changed }} <span style="color:#3fb950">+{{ r.additions }}</span> <span style="color:#f85149">-{{ r.deletions }}</span></td>
+                <td><span class="badge badge-{{ r.risk_level|lower }}">{{ r.risk_level }}</span></td>
+                <td>{{ "%.1f"|format(r.total_duration_ms / 1000) }}s</td>
+                <td style="color:#8b949e">{{ r.timestamp | int }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">📭</div>
+        <p>No pull requests processed yet.</p>
+        <p style="margin-top:8px;">Open a PR on a connected repo to see results here.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-refresh every 30 seconds
+setTimeout(() => location.reload(), 30000);
+</script>
+{% endblock %}

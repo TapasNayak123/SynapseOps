@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PR Summary Agent{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+        }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Nav */
+        .nav {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 14px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #f0f6fc; }
+        .nav-logo span { color: #58a6ff; }
+        .nav-link { color: #8b949e; font-size: 14px; }
+        .nav-link:hover { color: #f0f6fc; text-decoration: none; }
+
+        /* Layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+        /* Stat cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .stat-card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 32px; font-weight: 700; color: #f0f6fc; margin-top: 4px; }
+        .stat-card .sub { font-size: 13px; color: #8b949e; margin-top: 2px; }
+
+        /* Table */
+        .table-wrap {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #30363d;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left;
+            padding: 10px 20px;
+            font-size: 12px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #30363d;
+        }
+        td {
+            padding: 12px 20px;
+            font-size: 14px;
+            border-bottom: 1px solid #21262d;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #1c2128; }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-low { background: #0d419d; color: #79c0ff; }
+        .badge-medium { background: #4d2d00; color: #e3b341; }
+        .badge-high { background: #5a1e02; color: #f85149; }
+        .badge-unknown { background: #30363d; color: #8b949e; }
+
+        /* Detail page */
+        .detail-header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .detail-title { font-size: 22px; font-weight: 700; color: #f0f6fc; }
+        .detail-meta { font-size: 13px; color: #8b949e; margin-top: 8px; display: flex; gap: 20px; flex-wrap: wrap; }
+
+        .agent-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .agent-card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .agent-card-header .name { font-weight: 600; color: #f0f6fc; }
+        .agent-card-header .dur { font-size: 13px; color: #8b949e; }
+        .agent-card-body {
+            padding: 16px 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .summary-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 24px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b949e;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state p { font-size: 15px; }
+
+        .back-link { display: inline-block; margin-bottom: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="/" class="nav-logo">🤖 <span>PR Summary</span> Agent</a>
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/test" class="nav-link">Test PR</a>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}PR #{{ pr.pr_number }} — {{ pr.title }}{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link">← Back to Dashboard</a>
+
+<!-- PR Header -->
+<div class="detail-header">
+    <div class="detail-title">#{{ pr.pr_number }} — {{ pr.title }}</div>
+    <div class="detail-meta">
+        <span>👤 {{ pr.author }}</span>
+        <span>🏷️ {{ pr.pr_type }}</span>
+        <span>🎯 {{ pr.priority }}</span>
+        <span>📦 {{ pr.repo }}</span>
+        <span>🔀 {{ pr.branch }} → {{ pr.target }}</span>
+        <span>📁 {{ pr.files_changed }} files <span style="color:#3fb950">+{{ pr.additions }}</span> <span style="color:#f85149">-{{ pr.deletions }}</span></span>
+        <span>⏱️ {{ "%.1f"|format(pr.total_duration_ms / 1000) }}s total</span>
+        <span><span class="badge badge-{{ pr.risk_level|lower }}">{{ pr.risk_level }} Risk</span></span>
+    </div>
+</div>
+
+<!-- Agent Outputs -->
+<h3 style="color:#f0f6fc; margin-bottom:16px; font-size:16px;">🧠 Agent Outputs</h3>
+
+{% for agent in pr.agent_results %}
+<div class="agent-card">
+    <div class="agent-card-header">
+        <span class="name">
+            {% if agent.name == "Diff Analysis" %}🔍{% elif agent.name == "Code Review" %}🛡️{% else %}📝{% endif %}
+            {{ agent.name }} Agent
+        </span>
+        <span class="dur">{{ "%.1f"|format(agent.duration_ms / 1000) }}s</span>
+    </div>
+    <div class="agent-card-body">{{ agent.output }}</div>
+</div>
+{% endfor %}
+
+<!-- Final Summary -->
+<h3 style="color:#f0f6fc; margin: 24px 0 16px; font-size:16px;">📋 Final PR Summary (posted to GitHub)</h3>
+<div class="summary-box">{{ pr.summary }}</div>
+{% endblock %}

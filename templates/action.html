@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ action_title }} — PR #{{ pr_number }}{% endblock %}
+
+{% block content %}
+<div class="detail-header">
+    <div class="detail-title">{{ action_emoji }} {{ action_title }}</div>
+    <div class="detail-meta">
+        <span>📦 {{ repo }}</span>
+        <span>PR #{{ pr_number }}</span>
+    </div>
+</div>
+
+{% if result %}
+<div class="agent-card" style="border-color:{{ 'green' if success else '#f85149' }};">
+    <div class="agent-card-header" style="border-color:{{ 'green' if success else '#f85149' }};">
+        <span class="name" style="color:{{ '#3fb950' if success else '#f85149' }};">
+            {{ '✅' if success else '❌' }} {{ result }}
+        </span>
+    </div>
+</div>
+<div style="margin-top:16px; display:flex; gap:12px;">
+    <a href="/">← Dashboard</a>
+    <a href="https://github.com/{{ repo }}/pull/{{ pr_number }}" target="_blank">View on GitHub →</a>
+</div>
+
+{% else %}
+<div class="agent-card">
+    <div class="agent-card-body" style="white-space:normal;">
+        {% if action_type == 'approve' %}
+        <p style="margin-bottom:16px;">This will <span style="color:#3fb950; font-weight:600;">squash merge</span> PR #{{ pr_number }} on {{ repo }}.</p>
+        <form method="POST">
+            <button type="submit" style="background:#238636; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-size:15px; cursor:pointer; font-weight:600;">
+                ✅ Confirm Approve & Merge
+            </button>
+        </form>
+        {% else %}
+        <p style="margin-bottom:16px;">This will post a <span style="color:#f85149; font-weight:600;">changes requested</span> comment on PR #{{ pr_number }}.</p>
+        <form method="POST">
+            <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:4px;">Reason (optional)</label>
+                <textarea name="reason" rows="3" placeholder="Describe what needs to change..."
+                    style="background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 12px; border-radius:6px; font-size:14px; width:100%; max-width:500px;"></textarea>
+            </div>
+            <button type="submit" style="background:#da3633; color:#fff; border:none; padding:10px 24px; border-radius:6px; font-size:15px; cursor:pointer; font-weight:600;">
+                🔴 Confirm Request Changes
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Test PR Analysis{% endblock %}
+
+{% block content %}
+<div class="detail-header">
+    <div class="detail-title">🧪 Test PR Analysis</div>
+    <div class="detail-meta">
+        <span>Enter a GitHub repo and PR number to trigger the multi-agent pipeline manually.</span>
+    </div>
+</div>
+
+<div class="agent-card">
+    <div class="agent-card-header">
+        <span class="name">Analyze a Pull Request</span>
+    </div>
+    <div class="agent-card-body" style="white-space:normal;">
+        <form method="POST" action="/test" id="testForm">
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:end;">
+                <div>
+                    <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:4px;">Repository (owner/repo)</label>
+                    <input type="text" name="repo" placeholder="octocat/hello-world"
+                        value="{{ request.form.get('repo', '') }}"
+                        style="background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 12px; border-radius:6px; font-size:14px; width:280px;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:4px;">PR Number</label>
+                    <input type="number" name="pr_number" placeholder="1"
+                        value="{{ request.form.get('pr_number', '') }}"
+                        style="background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 12px; border-radius:6px; font-size:14px; width:100px;">
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" name="post_comment" id="postComment" style="accent-color:#58a6ff;">
+                    <label for="postComment" style="font-size:13px; color:#8b949e;">Post comment to GitHub</label>
+                </div>
+                <button type="submit" id="submitBtn"
+                    style="background:#238636; color:#fff; border:none; padding:8px 20px; border-radius:6px; font-size:14px; cursor:pointer; font-weight:600;">
+                    🚀 Run Analysis
+                </button>
+            </div>
+        </form>
+        <p style="margin-top:12px; font-size:12px; color:#8b949e;">
+            This fetches the PR from GitHub, runs all 3 agents via Bedrock, and stores the result on the dashboard.
+            Check the box to also post the summary as a PR comment.
+        </p>
+    </div>
+</div>
+
+{% if error %}
+<div class="agent-card" style="border-color:#f85149;">
+    <div class="agent-card-header" style="border-color:#f85149;">
+        <span class="name" style="color:#f85149;">❌ Error</span>
+    </div>
+    <div class="agent-card-body">{{ error }}</div>
+</div>
+{% endif %}
+
+{% if result %}
+<div class="agent-card" style="border-color:#238636;">
+    <div class="agent-card-header" style="border-color:#238636;">
+        <span class="name" style="color:#3fb950;">✅ Analysis Complete</span>
+        <span class="dur">
+            {% if result.posted %}📤 Posted to GitHub{% else %}📋 Not posted (checkbox was off){% endif %}
+        </span>
+    </div>
+    <div class="agent-card-body">{{ result.summary }}</div>
+</div>
+<div style="margin-top:12px;">
+    <a href="/pr/{{ result.repo }}/{{ result.pr_number }}">→ View full detail with agent breakdown</a>
+</div>
+{% endif %}
+
+<script>
+document.getElementById('testForm').addEventListener('submit', function() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running agents... (this takes 15-30s)';
+    btn.style.background = '#30363d';
+});
+</script>
+{% endblock %}
