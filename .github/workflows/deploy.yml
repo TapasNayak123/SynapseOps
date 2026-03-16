@@ -6,17 +6,16 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_REGION: us-east-1
   ECR_REPOSITORY: synapse-ops
-  EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
+  EKS_CLUSTER: auth-api-cluster
   HELM_RELEASE: synapse-ops
-  HELM_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'default' }}
+  HELM_NAMESPACE: default
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
 
     steps:
@@ -25,7 +24,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -42,6 +42,11 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.13.0'
+
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig \
@@ -57,9 +62,9 @@ jobs:
             --namespace ${{ env.HELM_NAMESPACE }} \
             --set image.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set image.tag=$IMAGE_TAG \
-            --set secrets.TEAMS_WEBHOOK_URL=${{ secrets.TEAMS_WEBHOOK_URL }} \
-            --set secrets.GITHUB_TOKEN=${{ secrets.TARGET_REPO_TOKEN }} \
-            --set env.GITHUB_REPO=${{ vars.TARGET_GITHUB_REPO }} \
+            --set secrets.TEAMS_WEBHOOK_URL="${{ secrets.TEAMS_WEBHOOK_URL }}" \
+            --set secrets.GITHUB_TOKEN="${{ secrets.TARGET_REPO_TOKEN }}" \
+            --set env.GITHUB_REPO="${{ vars.TARGET_GITHUB_REPO }}" \
             --wait --timeout 300s
 
       - name: Verify deployment

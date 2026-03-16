@@ -21,13 +21,12 @@ env:
   # Target Node.js app
   AWS_REGION: us-east-1
   CLOUDWATCH_LOG_GROUP: /aws/eks/auth-api
-  CLOUDWATCH_NAMESPACE: FruitBasketService
-  GITHUB_REPO: your-org/your-nodejs-repo
-  MONITORED_APIS: "/api/users,/api/orders,/api/payments"
+  GITHUB_REPO: TapasNayak123/aws_codethon_repo
+  MONITORED_APIS: "/api/auth/register,/api/auth/login,/api/products"
 
   # Agent infra
   DYNAMODB_TABLE_PREFIX: synapse-ops
-  REDIS_URL: redis://redis-service:6379/0
+  REDIS_URL: redis://redis-master:6379/0
   BEDROCK_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
   BEDROCK_REGION: us-east-1
   ERROR_RATE_THRESHOLD: "50.0"
@@ -41,7 +40,7 @@ serviceAccount:
   create: true
   name: synapse-ops-sa
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::YOUR_ACCOUNT:role/synapse-ops-role
+    eks.amazonaws.com/role-arn: arn:aws:iam::551494044780:role/synapse-ops-role
 
 ingress:
   enabled: false

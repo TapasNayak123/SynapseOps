@@ -1,5 +1,7 @@
+"""Alerts and auto-fix API endpoints."""
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+from typing import List
 from app.services.error_analyzer import ErrorAnalyzer
 from app.services.auto_fix import AutoFixService
 from app.services.code_analyzer import CodeAnalyzer
@@ -8,36 +10,47 @@ from app.services.cache import CacheService
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
-analyzer = ErrorAnalyzer()
-auto_fix = AutoFixService()
-code_analyzer = CodeAnalyzer()
-db = DynamoDBService()
-cache = CacheService()
-
-
-# --- Monitoring management ---
 
 class MonitoredApisRequest(BaseModel):
-    apis: list[str]
+    apis: List[str]
+
+    @field_validator("apis")
+    @classmethod
+    def validate_apis(cls, v: List[str]) -> List[str]:
+        if len(v) > 100:
+            raise ValueError("Max 100 APIs")
+        return [a.strip() for a in v if a.strip() and len(a) <= 200]
+
+
+class AutoFixRequest(BaseModel):
+    error_message: str
+    stack_trace: str = ""
+
+    @field_validator("error_message")
+    @classmethod
+    def validate_msg(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("error_message required")
+        if len(v) > 5000:
+            raise ValueError("error_message too long")
+        return v
 
 
 @router.get("/monitored-apis")
 def get_monitored_apis():
-    """Get list of currently monitored APIs."""
-    apis = cache.get("monitored_apis")
-    return {"monitored_apis": apis or []}
+    return {"monitored_apis": CacheService().get("monitored_apis") or []}
 
 
 @router.post("/monitored-apis")
 def set_monitored_apis(request: MonitoredApisRequest):
-    """Set the list of APIs to monitor."""
-    cache.set("monitored_apis", request.apis, ttl_seconds=86400 * 30)
+    CacheService().set("monitored_apis", request.apis, ttl_seconds=86400 * 30)
     return {"monitored_apis": request.apis, "count": len(request.apis)}
 
 
 @router.post("/monitored-apis/add/{api_path:path}")
 def add_monitored_api(api_path: str):
-    """Add a single API to the monitoring list."""
+    cache = CacheService()
     apis = cache.get("monitored_apis") or []
     if api_path not in apis:
         apis.append(api_path)
@@ -47,82 +60,40 @@ def add_monitored_api(api_path: str):
 
 @router.delete("/monitored-apis/remove/{api_path:path}")
 def remove_monitored_api(api_path: str):
-    """Remove a single API from the monitoring list."""
-    apis = cache.get("monitored_apis") or []
-    apis = [a for a in apis if a != api_path]
+    cache = CacheService()
+    apis = [a for a in (cache.get("monitored_apis") or []) if a != api_path]
     cache.set("monitored_apis", apis, ttl_seconds=86400 * 30)
     return {"monitored_apis": apis}
 
 
-# --- Error analysis & alerting ---
-
 @router.get("/check/{api_path:path}")
 def check_api_errors(api_path: str):
-    """Manually trigger error analysis for an API."""
-    return analyzer.analyze_api_errors(api_path)
+    return ErrorAnalyzer().analyze_api_errors(api_path)
 
 
 @router.get("/history/{api_path:path}")
 def get_alert_history(api_path: str, limit: int = Query(20, ge=1, le=100)):
-    """Get alert history for an API."""
-    return db.get_alerts(api_path, limit=limit)
-
-
-# --- Auto-fix ---
-
-class AutoFixRequest(BaseModel):
-    error_message: str
-    stack_trace: str = ""
+    return DynamoDBService().get_alerts(api_path, limit=limit)
 
 
 @router.post("/auto-fix")
 def trigger_auto_fix(request: AutoFixRequest):
-    """
-    Full auto-fix pipeline:
-    1. Categorize bug (rule-based pattern matching)
-    2. Parse stack trace → extract file path + line number
-    3. Fetch actual source code from GitHub
-    4. Send code + error to Bedrock LLM for fix generation
-    5. Create PR if auto-fixable + confidence >= 0.8
-    """
-    return auto_fix.analyze_and_fix(request.error_message, request.stack_trace)
-
-
-class CategorizeRequest(BaseModel):
-    error_message: str
-    stack_trace: str = ""
+    return AutoFixService().analyze_and_fix(request.error_message, request.stack_trace)
 
 
 @router.post("/categorize")
-def categorize_error(request: CategorizeRequest):
-    """
-    Categorize a bug without attempting a fix.
-    Returns category, severity, and whether it's auto-fixable.
-
-    Auto-fixable categories:
-    - null_reference, type_error, missing_import, unhandled_promise,
-      missing_null_check, syntax_error, env_config, missing_await,
-      wrong_status_code, missing_validation
-
-    Needs human review:
-    - memory_leak, race_condition, db_connection, auth_failure,
-      timeout, infrastructure, unknown
-    """
-    category = code_analyzer.categorize_error(request.error_message, request.stack_trace)
-    frames = code_analyzer.parse_stack_trace(request.stack_trace)
-    category["stack_frames"] = frames
-    return category
+def categorize_error(request: AutoFixRequest):
+    analyzer = CodeAnalyzer()
+    cat = analyzer.categorize_error(request.error_message, request.stack_trace)
+    cat["stack_frames"] = analyzer.parse_stack_trace(request.stack_trace)
+    return cat
 
 
 @router.get("/auto-fix/history")
 def get_fix_history(limit: int = Query(20, ge=1, le=100)):
-    """Get auto-fix attempt history."""
-    return auto_fix.get_fix_history(limit=limit)
+    return AutoFixService().get_fix_history(limit=limit)
 
-
-# --- Audit trail ---
 
 @router.get("/audit")
 def get_audit_logs(action: str = Query(None), limit: int = Query(50, ge=1, le=200)):
-    """Get audit logs (all agent actions are tracked)."""
-    return db.get_audit_logs(action=action, limit=limit)
+    return DynamoDBService().get_audit_logs(action=action, limit=limit)

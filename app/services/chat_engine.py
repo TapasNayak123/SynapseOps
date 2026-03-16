@@ -1,7 +1,4 @@
-"""
-Smart chat engine that interprets user intent and queries the right data sources.
-Supports natural language time ranges, comparative queries, and data-driven answers.
-"""
+"""Smart chat engine with intent classification and data-driven responses."""
 import json
 import structlog
 from app.services.llm import LLMService
@@ -30,119 +27,60 @@ class ChatEngine:
         self.deployments = DeploymentTracker()
 
     def process_message(self, message: str, extra_context: dict = None) -> dict:
-        """
-        Interpret user message, determine intent, fetch relevant data,
-        and generate a contextual response.
-        """
         intent = self._classify_intent(message)
-        data = self._fetch_data_for_intent(intent, message)
-
+        data = self._fetch_data(intent)
         if extra_context:
             data.update(extra_context)
-
-        # Generate response with full context
-        response = self.llm.chat(message, data)
-
-        return {
-            "response": response,
-            "intent": intent,
-            "data": data,
-        }
+        return {"response": self.llm.chat(message, data), "intent": intent, "data": data}
 
     def _classify_intent(self, message: str) -> dict:
-        """Use LLM to classify the user's intent into actionable categories."""
-        prompt = f"""Classify this monitoring query into one of these intents.
-Return ONLY valid JSON, no other text.
-
-Intents:
-- top_apis: user wants to see most used APIs
-- slowest_apis: user wants to see slow APIs
-- api_history: user wants history of a specific API (extract api_path)
-- correlation_trace: user wants to trace a request (extract correlation_id)
-- error_analysis: user wants to see errors (extract status_code if mentioned)
-- compare: user wants to compare periods (extract api_path, periods)
-- incident_timeline: user wants to know what happened in a time range (extract start_hour, end_hour)
-- health_check: user wants health score of an API (extract api_path)
-- sla_check: user wants SLA compliance (extract api_path)
-- deployment_check: user wants to see recent deployments or correlate with errors
-- anomaly_check: user wants anomaly/prediction info (extract api_path)
-- recurring_errors: user wants to see recurring/repeated errors
-- general: general question about the service
-
-User message: "{message}"
-
-JSON format: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_code": null, "start_hour": null, "end_hour": null, "hours_back": 1}}"""
-
+        # Sanitize user message to prevent prompt injection
+        sanitized = message.replace('"', '\\"').replace('\n', ' ').replace('\r', '')[:500]
+        prompt = f"""Classify this monitoring query. Return ONLY valid JSON.
+Intents: top_apis, slowest_apis, api_history, correlation_trace, error_analysis, compare, incident_timeline, health_check, sla_check, deployment_check, anomaly_check, recurring_errors, general
+User: "{sanitized}"
+JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_code": null, "start_hour": null, "end_hour": null, "hours_back": 1}}"""
         try:
-            result = self.llm.invoke(prompt, max_tokens=256)
-            return json.loads(result)
-        except (json.JSONDecodeError, Exception):
+            return json.loads(self.llm.invoke(prompt, max_tokens=256))
+        except Exception:
             return {"intent": "general"}
 
-    def _fetch_data_for_intent(self, intent: dict, message: str) -> dict:
-        """Fetch the right data based on classified intent."""
-        intent_type = intent.get("intent", "general")
-        api_path = intent.get("api_path", "")
-        hours_back = int(intent.get("hours_back", 1) or 1)
+    def _fetch_data(self, intent: dict) -> dict:
+        t = intent.get("intent", "general")
+        api = intent.get("api_path", "")
+        hours = int(intent.get("hours_back", 1) or 1)
 
         try:
-            if intent_type == "top_apis":
-                return {"top_apis": self.logs.get_top_apis(hours_back=hours_back)}
-
-            elif intent_type == "slowest_apis":
-                return {"slowest_apis": self.perf.get_slowest_apis(hours_back=hours_back)}
-
-            elif intent_type == "api_history" and api_path:
-                return {"api_history": self.logs.get_api_history(api_path, hours_back=hours_back)}
-
-            elif intent_type == "correlation_trace":
+            if t == "top_apis":
+                return {"top_apis": self.logs.get_top_apis(hours_back=hours)}
+            if t == "slowest_apis":
+                return {"slowest_apis": self.perf.get_slowest_apis(hours_back=hours)}
+            if t == "api_history" and api:
+                return {"api_history": self.logs.get_api_history(api, hours_back=hours)}
+            if t == "correlation_trace":
                 cid = intent.get("correlation_id", "")
-                if cid:
-                    return {"trace": self.logs.search_by_correlation_id(cid)}
-                return {"error": "No correlation ID provided"}
-
-            elif intent_type == "error_analysis":
-                status = intent.get("status_code")
-                if status:
-                    return {"errors": self.logs.search_errors(status_code=int(status), hours_back=hours_back)}
-                return {"errors_by_status": self.errors.get_errors_by_status(hours_back)}
-
-            elif intent_type == "compare" and api_path:
-                return {"comparison": self.incidents.compare_periods(api_path)}
-
-            elif intent_type == "incident_timeline":
-                start = int(intent.get("start_hour", 0) or 0)
-                end = int(intent.get("end_hour", 23) or 23)
-                return {"timeline": self.incidents.build_incident_timeline(start, end)}
-
-            elif intent_type == "health_check" and api_path:
-                return {"health": self.perf.compute_health_score(api_path)}
-
-            elif intent_type == "sla_check" and api_path:
-                return {"sla": self.sla.check_sla_compliance(api_path)}
-
-            elif intent_type == "deployment_check":
+                return {"trace": self.logs.search_by_correlation_id(cid)} if cid else {"error": "No correlation ID"}
+            if t == "error_analysis":
+                sc = intent.get("status_code")
+                return {"errors": self.logs.search_errors(status_code=int(sc), hours_back=hours)} if sc else {"errors_by_status": self.errors.get_errors_by_status(hours)}
+            if t == "compare" and api:
+                return {"comparison": self.incidents.compare_periods(api)}
+            if t == "incident_timeline":
+                return {"timeline": self.incidents.build_incident_timeline(int(intent.get("start_hour", 0) or 0), int(intent.get("end_hour", 23) or 23))}
+            if t == "health_check" and api:
+                return {"health": self.perf.compute_health_score(api)}
+            if t == "sla_check" and api:
+                return {"sla": self.sla.check_sla_compliance(api)}
+            if t == "deployment_check":
                 data = {"deployments": self.deployments.get_recent_deployments()}
-                if api_path:
-                    data["correlation"] = self.deployments.correlate_with_errors(api_path)
+                if api:
+                    data["correlation"] = self.deployments.correlate_with_errors(api)
                 return data
-
-            elif intent_type == "anomaly_check" and api_path:
-                return {
-                    "prediction": self.anomaly.predict_error_trend(api_path),
-                    "traffic_anomaly": self.anomaly.detect_traffic_anomaly(api_path),
-                }
-
-            elif intent_type == "recurring_errors":
+            if t == "anomaly_check" and api:
+                return {"prediction": self.anomaly.predict_error_trend(api), "traffic_anomaly": self.anomaly.detect_traffic_anomaly(api)}
+            if t == "recurring_errors":
                 return {"recurring": self.incidents.detect_recurring_errors()}
-
-            else:
-                # General: provide a summary
-                return {
-                    "top_apis": self.logs.get_top_apis(hours_back=1, size=5),
-                    "slowest_apis": self.cw.get_slowest_apis(hours_back=1, limit=5),
-                }
-
+            return {"top_apis": self.logs.get_top_apis(hours_back=1, size=5), "slowest_apis": self.cw.get_slowest_apis(hours_back=1, limit=5)}
         except Exception as e:
-            logger.error("chat_data_fetch_failed", intent=intent_type, error=str(e))
-            return {"error": f"Failed to fetch data: {str(e)}"}
+            logger.error("fetch_failed", intent=t, error=str(e))
+            return {"error": str(e)}
