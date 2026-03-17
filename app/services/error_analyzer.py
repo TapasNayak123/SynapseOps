@@ -60,8 +60,9 @@ class ErrorAnalyzer:
 
     def get_errors_by_status(self, hours_back: int = 1) -> dict:
         """Single aggregated query for error breakdown by status code."""
-        query = """fields @timestamp, statusCode, path, errorCode, message
-            | filter statusCode >= 400
+        api_filter = self.cw._api_filter
+        query = f"""fields @timestamp, statusCode, path, errorCode, message
+            | filter statusCode >= 400 and {api_filter}
             | stats count(*) as cnt by statusCode
             | sort cnt desc"""
         results = self.cw.query_logs(query, hours_back, limit=50)

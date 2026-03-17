@@ -268,67 +268,91 @@
             50% { box-shadow: 0 6px 30px rgba(88,166,255,0.35), 0 0 0 12px rgba(88,166,255,0); }
         }
 
+        /* Backdrop overlay */
+        .chat-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            z-index: 998;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .chat-overlay.open { opacity: 1; pointer-events: all; }
+
+        /* Centered modal chat window */
         .chat-window {
-            position: fixed; bottom: 100px; right: 28px;
-            width: 480px; max-height: 480px;
-            background: rgba(10,14,23,0.97);
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            width: 680px; height: 75vh; max-height: 700px;
+            background: rgba(10,14,23,0.98);
             backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
             border: 1px solid rgba(88,166,255,0.12); border-radius: 20px;
             z-index: 999; display: flex; flex-direction: column; overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(88,166,255,0.05);
-            opacity: 0; transform: translateY(20px) scale(0.95);
-            pointer-events: none;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(88,166,255,0.06);
+            opacity: 0; pointer-events: none;
             transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .chat-window.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; }
+        .chat-window.open {
+            opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: all;
+        }
 
         .chat-win-header {
-            padding: 18px 20px; border-bottom: 1px solid rgba(88,166,255,0.08);
+            padding: 18px 24px; border-bottom: 1px solid rgba(88,166,255,0.08);
             display: flex; align-items: center; gap: 12px; flex-shrink: 0;
         }
         .chat-win-header-icon {
-            width: 38px; height: 38px;
+            width: 40px; height: 40px;
             background: linear-gradient(135deg, #58a6ff, #a78bfa);
             border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            font-size: 18px; box-shadow: 0 4px 12px rgba(88,166,255,0.2);
+            font-size: 20px; box-shadow: 0 4px 12px rgba(88,166,255,0.2);
         }
-        .chat-win-header-text h3 { font-size: 14px; font-weight: 800; color: #f0f6fc; letter-spacing: -0.3px; }
+        .chat-win-header-text h3 { font-size: 16px; font-weight: 800; color: #f0f6fc; letter-spacing: -0.3px; }
         .chat-win-header-text p {
-            font-size: 11px; color: #3fb950; font-weight: 600;
+            font-size: 12px; color: #3fb950; font-weight: 600;
             display: flex; align-items: center; gap: 5px;
         }
         .chat-win-header-text p::before {
             content: ''; width: 6px; height: 6px; border-radius: 50%;
             background: #3fb950; display: inline-block;
         }
+        .chat-header-actions { margin-left: auto; display: flex; gap: 6px; }
+        .chat-header-btn {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px; padding: 6px 12px; cursor: pointer;
+            font-size: 12px; font-weight: 600; color: #6e7681;
+            font-family: 'Inter', sans-serif; transition: all 0.2s;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .chat-header-btn:hover { background: rgba(88,166,255,0.1); color: #c9d1d9; border-color: rgba(88,166,255,0.2); }
 
         .chat-win-body {
-            flex: 1; overflow-y: auto; padding: 16px;
-            display: flex; flex-direction: column; gap: 10px;
+            flex: 1; overflow-y: auto; padding: 20px 24px;
+            display: flex; flex-direction: column; gap: 12px;
         }
-        .chat-welcome { text-align: center; padding: 30px 16px; }
-        .chat-welcome-emoji { font-size: 36px; margin-bottom: 12px; }
-        .chat-welcome h4 { font-size: 15px; font-weight: 700; color: #f0f6fc; margin-bottom: 6px; }
-        .chat-welcome p { font-size: 12px; color: #484f58; line-height: 1.5; }
+        .chat-welcome { text-align: center; padding: 40px 20px; }
+        .chat-welcome-emoji { font-size: 44px; margin-bottom: 14px; }
+        .chat-welcome h4 { font-size: 18px; font-weight: 800; color: #f0f6fc; margin-bottom: 8px; }
+        .chat-welcome p { font-size: 14px; color: #6e7681; line-height: 1.6; max-width: 400px; margin: 0 auto; }
 
-        .chat-quick-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 4px; }
+        .chat-quick-btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 0 8px; }
         .chat-quick-btn {
             background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.08);
-            border-radius: 10px; padding: 10px 12px; cursor: pointer;
+            border-radius: 12px; padding: 14px 14px; cursor: pointer;
             transition: all 0.2s; text-align: left; color: #c9d1d9;
             font-family: 'Inter', sans-serif;
         }
         .chat-quick-btn:hover {
             background: rgba(88,166,255,0.06); border-color: rgba(88,166,255,0.2);
-            transform: translateY(-1px);
+            transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .chat-quick-btn .qicon { font-size: 16px; margin-bottom: 4px; }
-        .chat-quick-btn .qtitle { font-size: 11px; font-weight: 700; color: #f0f6fc; }
-        .chat-quick-btn .qdesc { font-size: 10px; color: #484f58; margin-top: 2px; }
+        .chat-quick-btn .qicon { font-size: 20px; margin-bottom: 6px; }
+        .chat-quick-btn .qtitle { font-size: 13px; font-weight: 700; color: #f0f6fc; }
+        .chat-quick-btn .qdesc { font-size: 11px; color: #484f58; margin-top: 3px; }
 
         .chat-msg {
-            max-width: 85%; padding: 10px 14px; border-radius: 14px;
-            font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;
+            max-width: 80%; padding: 12px 16px; border-radius: 16px;
+            font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-wrap: break-word;
             animation: chatFadeIn 0.3s ease;
         }
         @keyframes chatFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -343,19 +367,37 @@
             background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
             color: #c9d1d9; border-bottom-left-radius: 4px;
         }
-        .chat-msg .chat-data {
-            margin-top: 8px; padding: 8px 10px;
-            background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 8px; font-size: 10px; font-family: 'Courier New', monospace;
-            max-height: 150px; overflow-y: auto; color: #6e7681;
+
+        /* JSON toggle */
+        .chat-data-toggle {
+            display: inline-flex; align-items: center; justify-content: center;
+            margin-top: 10px;
+            width: 32px; height: 32px;
+            background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.15);
+            border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 800; color: #484f58;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            transition: all 0.2s; user-select: none;
         }
+        .chat-data-toggle:hover { background: rgba(88,166,255,0.15); color: #79c0ff; }
+        .chat-data-toggle.expanded { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.25); color: #a78bfa; }
+
+        .chat-data {
+            margin-top: 8px; padding: 12px 14px;
+            background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px; font-size: 12px; font-family: 'JetBrains Mono', 'Courier New', monospace;
+            max-height: 250px; overflow-y: auto; color: #8b949e;
+            display: none;
+        }
+        .chat-data.visible { display: block; }
+
         .chat-typing {
-            align-self: flex-start; padding: 10px 18px;
+            align-self: flex-start; padding: 12px 20px;
             background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 14px; border-bottom-left-radius: 4px;
+            border-radius: 16px; border-bottom-left-radius: 4px;
         }
         .chat-typing span {
-            display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
             background: #58a6ff; margin: 0 2px; animation: chatDots 1.4s infinite both;
         }
         .chat-typing span:nth-child(2) { animation-delay: 0.2s; }
@@ -366,39 +408,29 @@
         }
 
         .chat-win-input {
-            padding: 14px 16px; border-top: 1px solid rgba(88,166,255,0.08);
-            display: flex; gap: 8px; flex-shrink: 0; background: rgba(6,10,19,0.5);
+            padding: 16px 24px; border-top: 1px solid rgba(88,166,255,0.08);
+            display: flex; gap: 10px; flex-shrink: 0; background: rgba(6,10,19,0.5);
         }
         .chat-win-input input {
             flex: 1; background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(88,166,255,0.1); border-radius: 10px;
-            padding: 10px 14px; color: #c9d1d9; font-size: 13px;
+            border: 1px solid rgba(88,166,255,0.1); border-radius: 12px;
+            padding: 12px 16px; color: #c9d1d9; font-size: 14px;
             font-family: 'Inter', sans-serif; outline: none; transition: all 0.2s;
         }
         .chat-win-input input:focus { border-color: rgba(88,166,255,0.35); background: rgba(255,255,255,0.06); }
         .chat-win-input input::placeholder { color: #30363d; }
         .chat-win-input button {
             background: linear-gradient(135deg, #58a6ff, #a78bfa);
-            border: none; border-radius: 10px; padding: 10px 18px;
-            color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+            border: none; border-radius: 12px; padding: 12px 24px;
+            color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
             font-family: 'Inter', sans-serif; transition: all 0.2s; white-space: nowrap;
         }
         .chat-win-input button:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(88,166,255,0.3); }
         .chat-win-input button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
-        .chat-header-actions { margin-left: auto; display: flex; gap: 6px; }
-        .chat-header-btn {
-            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 8px; padding: 5px 10px; cursor: pointer;
-            font-size: 11px; font-weight: 600; color: #6e7681;
-            font-family: 'Inter', sans-serif; transition: all 0.2s;
-            display: flex; align-items: center; gap: 4px;
-        }
-        .chat-header-btn:hover { background: rgba(88,166,255,0.1); color: #c9d1d9; border-color: rgba(88,166,255,0.2); }
-
-        @media (max-width: 500px) {
-            .chat-window { right: 12px; left: 12px; bottom: 90px; width: auto; height: 70vh; }
-            .chat-fab { bottom: 20px; right: 20px; width: 54px; height: 54px; font-size: 22px; }
+        @media (max-width: 720px) {
+            .chat-window { width: 95vw; height: 80vh; }
+            .chat-quick-btns { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -424,9 +456,10 @@
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Floating Chat Widget -->
+    <!-- Chat Overlay + Floating Widget -->
+    <div class="chat-overlay" id="chatOverlay"></div>
     <button class="chat-fab" id="chatFab" onclick="toggleChat()" aria-label="Open chat assistant">💬</button>
-    <div class="chat-window" id="chatWindow">
+    <div class="chat-window" id="chatWindow" onclick="event.stopPropagation()">
         <div class="chat-win-header">
             <div class="chat-win-header-icon">⚡</div>
             <div class="chat-win-header-text">
@@ -434,7 +467,8 @@
                 <p>Ready to help</p>
             </div>
             <div class="chat-header-actions">
-                <button class="chat-header-btn" id="chatResetBtn" onclick="chatReset()" title="New conversation">🔄 New</button>
+                <button class="chat-header-btn" onclick="chatReset()" title="New conversation">🔄 New</button>
+                <button class="chat-header-btn" onclick="toggleChat()" title="Close">✕</button>
             </div>
         </div>
         <div class="chat-win-body" id="chatBody">
@@ -450,7 +484,7 @@
                 <button class="chat-quick-btn" onclick="chatSend('Show me 500 errors from last hour')">
                     <div class="qicon">🚨</div><div class="qtitle">Error Analysis</div><div class="qdesc">Recent 500 errors</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('What\\'s the slowest API?')">
+                <button class="chat-quick-btn" onclick="chatSend('Show the slowest API')">
                     <div class="qicon">🐢</div><div class="qtitle">Slowest APIs</div><div class="qdesc">High latency endpoints</div>
                 </button>
                 <button class="chat-quick-btn" onclick="chatSend('Any recent deployments causing issues?')">
@@ -465,8 +499,8 @@
             </div>
         </div>
         <div class="chat-win-input">
-            <input type="text" id="chatInput" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')chatSend()">
-            <button id="chatSendBtn" onclick="chatSend()">Send</button>
+            <input type="text" id="chatInput" placeholder="Ask anything about your APIs..." onkeydown="if(event.key==='Enter')chatSend()">
+            <button id="chatSendBtn" onclick="chatSend()">Send →</button>
         </div>
     </div>
 
@@ -485,7 +519,7 @@
                 <button class="chat-quick-btn" onclick="chatSend('Show me 500 errors from last hour')">
                     <div class="qicon">🚨</div><div class="qtitle">Error Analysis</div><div class="qdesc">Recent 500 errors</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('What\\'s the slowest API?')">
+                <button class="chat-quick-btn" onclick="chatSend('Show the slowest API')">
                     <div class="qicon">🐢</div><div class="qtitle">Slowest APIs</div><div class="qdesc">High latency endpoints</div>
                 </button>
                 <button class="chat-quick-btn" onclick="chatSend('Any recent deployments causing issues?')">
@@ -500,8 +534,7 @@
             </div>`;
 
     function chatReset() {
-        const body = document.getElementById('chatBody');
-        body.innerHTML = WELCOME_HTML;
+        document.getElementById('chatBody').innerHTML = WELCOME_HTML;
         chatHasMessages = false;
         document.getElementById('chatInput').value = '';
         document.getElementById('chatInput').focus();
@@ -512,7 +545,14 @@
         document.getElementById('chatFab').classList.toggle('open', chatOpen);
         document.getElementById('chatFab').innerHTML = chatOpen ? '✕' : '💬';
         document.getElementById('chatWindow').classList.toggle('open', chatOpen);
+        document.getElementById('chatOverlay').classList.toggle('open', chatOpen);
         if (chatOpen) setTimeout(() => document.getElementById('chatInput').focus(), 100);
+    }
+
+    function toggleJsonData(btn) {
+        const dataEl = btn.nextElementSibling;
+        const expanded = dataEl.classList.toggle('visible');
+        btn.classList.toggle('expanded', expanded);
     }
 
     function appendMsg(role, text, data) {
@@ -528,6 +568,11 @@
         div.className = 'chat-msg ' + role;
         div.textContent = text;
         if (data && Object.keys(data).length > 0 && !data.error) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'chat-data-toggle';
+            toggleBtn.onclick = function() { toggleJsonData(this); };
+            toggleBtn.innerHTML = '{ }';
+            div.appendChild(toggleBtn);
             const box = document.createElement('div');
             box.className = 'chat-data';
             const pre = document.createElement('pre');
@@ -575,6 +620,7 @@
         document.getElementById('chatSendBtn').disabled = false;
         input.focus();
     }
+
     </script>
 </body>
 </html>
