@@ -12,7 +12,8 @@ from github_client import gh_headers, GITHUB_API, _get_session
 from store import PipelineRecord, pipeline_store
 from auto_healer import generate_fix, apply_fix, send_autoheal_notification
 from activity_log import activity_log
-from app.services.notifier import _get_http
+from app.services.notifier import _get_http, _WEBHOOK_RETRYABLE
+from app.services.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -181,15 +182,16 @@ def send_pipeline_failure_notification(
     }
 
     try:
-        resp = _get_http().post(
-            TEAMS_WEBHOOK_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        resp.raise_for_status()
-        logger.info("✅ Pipeline failure notification sent for run %s", run.get("id"))
+        _send_pipeline_notification_with_retry(TEAMS_WEBHOOK_URL, payload, run)
     except Exception:
         logger.exception("❌ Failed to send pipeline failure notification")
+
+
+@retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=15.0, retryable_exceptions=_WEBHOOK_RETRYABLE)
+def _send_pipeline_notification_with_retry(webhook_url: str, payload: dict, run: dict):
+    resp = _get_http().post(webhook_url, json=payload, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    logger.info("✅ Pipeline failure notification sent for run %s", run.get("id"))
 
 
 def process_failed_run(repo: str, run: dict):

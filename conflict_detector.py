@@ -7,7 +7,8 @@ import logging
 from config import TEAMS_WEBHOOK_URL, APP_BASE_URL
 from github_client import get_pr_files, post_pr_comment, gh_headers, GITHUB_API, _get_session
 from activity_log import activity_log
-from app.services.notifier import _get_http
+from app.services.notifier import _get_http, _WEBHOOK_RETRYABLE
+from app.services.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -160,15 +161,16 @@ def _send_conflict_teams_notification(
     }
 
     try:
-        resp = _get_http().post(
-            TEAMS_WEBHOOK_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        resp.raise_for_status()
-        logger.info("✅ Conflict notification sent for PR #%s", pr_number)
+        _send_conflict_notification_with_retry(TEAMS_WEBHOOK_URL, payload, pr_number)
     except Exception:
         logger.exception("❌ Failed to send conflict notification")
+
+
+@retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=15.0, retryable_exceptions=_WEBHOOK_RETRYABLE)
+def _send_conflict_notification_with_retry(webhook_url: str, payload: dict, pr_number: int):
+    resp = _get_http().post(webhook_url, json=payload, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    logger.info("✅ Conflict notification sent for PR #%s", pr_number)
 
 
 def check_conflicts(repo: str, pr_number: int, pr_files: list[dict],

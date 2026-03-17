@@ -8,6 +8,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from config import GITHUB_TOKEN
+from app.services.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,13 @@ GITHUB_API = "https://api.github.com"
 
 _session = None
 _session_lock = threading.Lock()
+
+# GitHub API transient errors worth retrying
+_GH_RETRYABLE = (
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    requests.exceptions.HTTPError,
+)
 
 
 def _get_session() -> requests.Session:
@@ -43,6 +51,7 @@ def _headers() -> dict:
 gh_headers = _headers
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def get_pr_details(repo_full_name: str, pr_number: int) -> dict:
     """Fetch PR metadata (title, body, author, branch info)."""
     url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}"
@@ -51,6 +60,7 @@ def get_pr_details(repo_full_name: str, pr_number: int) -> dict:
     return resp.json()
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def get_pr_diff(repo_full_name: str, pr_number: int) -> str:
     """Fetch the raw diff of a pull request."""
     url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}"
@@ -61,6 +71,7 @@ def get_pr_diff(repo_full_name: str, pr_number: int) -> str:
     return resp.text
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def get_pr_files(repo_full_name: str, pr_number: int) -> list[dict]:
     """Fetch list of changed files with stats."""
     url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}/files"
@@ -69,6 +80,7 @@ def get_pr_files(repo_full_name: str, pr_number: int) -> list[dict]:
     return resp.json()
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def post_pr_comment(repo_full_name: str, pr_number: int, body: str) -> dict:
     """Post a comment on the pull request."""
     url = f"{GITHUB_API}/repos/{repo_full_name}/issues/{pr_number}/comments"
@@ -77,6 +89,7 @@ def post_pr_comment(repo_full_name: str, pr_number: int, body: str) -> dict:
     return resp.json()
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def merge_pr(repo_full_name: str, pr_number: int, commit_title: str = None) -> dict:
     """Merge a pull request."""
     url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}/merge"
@@ -88,6 +101,7 @@ def merge_pr(repo_full_name: str, pr_number: int, commit_title: str = None) -> d
     return resp.json()
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def update_pr_body(repo_full_name: str, pr_number: int, body: str) -> dict:
     """Update the body/description of a pull request."""
     url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}"
@@ -98,6 +112,7 @@ def update_pr_body(repo_full_name: str, pr_number: int, body: str) -> dict:
 
 # ── Auto-heal: file and workflow functions ────────────────────────────────
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def get_file_content(repo: str, path: str, branch: str) -> dict:
     """Get file content and SHA from a branch."""
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
@@ -106,6 +121,7 @@ def get_file_content(repo: str, path: str, branch: str) -> dict:
     return resp.json()
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def update_file(repo: str, path: str, content_b64: str, message: str, branch: str, file_sha: str) -> dict:
     """Update a file on a branch (content must be base64 encoded)."""
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
@@ -119,6 +135,7 @@ def update_file(repo: str, path: str, content_b64: str, message: str, branch: st
     return resp.json()
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def create_file(repo: str, path: str, content_b64: str, message: str, branch: str) -> dict:
     """Create a new file on a branch (content must be base64 encoded)."""
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
@@ -131,6 +148,7 @@ def create_file(repo: str, path: str, content_b64: str, message: str, branch: st
     return resp.json()
 
 
+@retry_with_backoff(max_retries=3, base_delay=1.0, retryable_exceptions=_GH_RETRYABLE)
 def rerun_workflow(repo: str, run_id: int) -> bool:
     """Re-run a failed workflow run."""
     url = f"{GITHUB_API}/repos/{repo}/actions/runs/{run_id}/rerun-failed-jobs"

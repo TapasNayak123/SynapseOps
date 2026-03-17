@@ -1,4 +1,6 @@
 """Auto-fix engine: categorize bugs, fetch code from GitHub, generate fixes via LLM, create PRs."""
+from __future__ import annotations
+
 import json
 import base64
 import structlog

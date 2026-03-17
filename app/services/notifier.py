@@ -4,6 +4,7 @@ import threading
 import structlog
 from typing import Optional
 from app.config import get_settings
+from app.services.retry import retry_with_backoff
 
 logger = structlog.get_logger()
 
@@ -15,6 +16,17 @@ ICONS = {
 
 _http: Optional[httpx.Client] = None
 _http_lock = threading.Lock()
+
+# Transient HTTP errors worth retrying for webhook calls
+_WEBHOOK_RETRYABLE = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.ReadTimeout,
+    httpx.WriteTimeout,
+    httpx.PoolTimeout,
+    ConnectionError,
+    TimeoutError,
+)
 
 
 def _get_http() -> httpx.Client:
@@ -74,14 +86,15 @@ class NotifierService:
         }
 
         try:
-            resp = _get_http().post(self.webhook_url, json=payload, headers={"Content-Type": "application/json"})
-            resp.raise_for_status()
-            logger.info("teams_alert_sent", alert_type=alert_type)
+            self._send_with_retry(payload, alert_type)
             return True
-        except httpx.HTTPStatusError as e:
-            logger.error("teams_alert_http_error", status=e.response.status_code, error=str(e))
-            return False
         except Exception as e:
             logger.error("teams_alert_failed", error=str(e))
             _reset_http()
             return False
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=15.0, retryable_exceptions=_WEBHOOK_RETRYABLE)
+    def _send_with_retry(self, payload: dict, alert_type: str):
+        resp = _get_http().post(self.webhook_url, json=payload, headers={"Content-Type": "application/json"})
+        resp.raise_for_status()
+        logger.info("teams_alert_sent", alert_type=alert_type)

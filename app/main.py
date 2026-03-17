@@ -20,13 +20,12 @@ from app.routes import metrics, chat, alerts
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 # Root-level imports (PR analysis pipeline)
-from config import GITHUB_WEBHOOK_SECRET, GITHUB_REPOS, POLL_INTERVAL
+from config import GITHUB_WEBHOOK_SECRET
 from github_client import get_pr_details, get_pr_diff, get_pr_files, post_pr_comment, merge_pr
 from agents import supervisor, check_and_generate_description
 from conflict_detector import check_conflicts
 from store import pr_store, pipeline_store
-from poller import start_poller
-from pipeline_monitor import start_pipeline_monitor
+from pipeline_monitor import process_failed_run, get_run_jobs
 from activity_log import activity_log
 
 structlog.configure(processors=[
@@ -69,13 +68,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("scheduler_start_failed", error=str(e))
 
-    # Start PR poller + pipeline monitor threads
-    if GITHUB_REPOS:
-        py_logger.info("Watching repos: %s (polling every %ds)", GITHUB_REPOS, POLL_INTERVAL)
-        start_poller(GITHUB_REPOS, POLL_INTERVAL)
-        start_pipeline_monitor(GITHUB_REPOS, POLL_INTERVAL)
-    else:
-        py_logger.info("No GITHUB_REPO configured — poller disabled.")
+    py_logger.info("Webhook mode active — listening on /webhook for PR and pipeline events.")
 
     yield
 
@@ -360,33 +353,56 @@ async def webhook(request: Request):
     event = request.headers.get("X-GitHub-Event", "")
     payload = await request.json()
 
-    if event != "pull_request":
-        return {"message": f"Ignored event: {event}"}
+    # ── Pull Request events ───────────────────────────────────────────
+    if event == "pull_request":
+        action = payload.get("action", "")
+        if action not in ("opened", "synchronize", "reopened"):
+            return {"message": f"Ignored PR action: {action}"}
 
-    action = payload.get("action", "")
-    if action not in ("opened", "synchronize", "reopened"):
-        return {"message": f"Ignored PR action: {action}"}
+        pr = payload["pull_request"]
+        repo_full_name = payload["repository"]["full_name"]
+        pr_number = pr["number"]
 
-    pr = payload["pull_request"]
-    repo_full_name = payload["repository"]["full_name"]
-    pr_number = pr["number"]
+        py_logger.info("Processing PR #%s on %s (action=%s)", pr_number, repo_full_name, action)
 
-    py_logger.info("Processing PR #%s on %s (action=%s)", pr_number, repo_full_name, action)
+        try:
+            pr_details = get_pr_details(repo_full_name, pr_number)
+            diff = get_pr_diff(repo_full_name, pr_number)
+            files = get_pr_files(repo_full_name, pr_number)
 
-    try:
-        pr_details = get_pr_details(repo_full_name, pr_number)
-        diff = get_pr_diff(repo_full_name, pr_number)
-        files = get_pr_files(repo_full_name, pr_number)
+            check_and_generate_description(pr_details, diff, files, repo_full_name, pr_number)
+            check_conflicts(repo_full_name, pr_number, files,
+                            pr_title=pr.get("title", ""),
+                            pr_author=pr.get("user", {}).get("login", ""))
 
-        check_and_generate_description(pr_details, diff, files, repo_full_name, pr_number)
-        check_conflicts(repo_full_name, pr_number, files,
-                        pr_title=pr.get("title", ""),
-                        pr_author=pr.get("user", {}).get("login", ""))
+            summary = supervisor(pr_details, diff, files, repo_full_name, pr_number)
+            post_pr_comment(repo_full_name, pr_number, summary)
+            py_logger.info("Posted AI summary on PR #%s", pr_number)
+            return {"message": "Summary posted", "pr": pr_number}
+        except Exception:
+            py_logger.exception("Failed to process PR #%s", pr_number)
+            raise HTTPException(status_code=500, detail="Processing failed")
 
-        summary = supervisor(pr_details, diff, files, repo_full_name, pr_number)
-        post_pr_comment(repo_full_name, pr_number, summary)
-        py_logger.info("Posted AI summary on PR #%s", pr_number)
-        return {"message": "Summary posted", "pr": pr_number}
-    except Exception:
-        py_logger.exception("Failed to process PR #%s", pr_number)
-        raise HTTPException(status_code=500, detail="Processing failed")
+    # ── Workflow Run events (pipeline monitoring) ─────────────────────
+    if event == "workflow_run":
+        action = payload.get("action", "")
+        run = payload.get("workflow_run", {})
+        conclusion = run.get("conclusion", "")
+
+        if action != "completed" or conclusion != "failure":
+            return {"message": f"Ignored workflow_run action={action} conclusion={conclusion}"}
+
+        repo_full_name = payload["repository"]["full_name"]
+        run_id = run.get("id")
+
+        py_logger.info("Pipeline failure detected: %s — %s (run %s)",
+                       repo_full_name, run.get("name"), run_id)
+
+        try:
+            process_failed_run(repo_full_name, run)
+            return {"message": "Pipeline failure processed", "run_id": run_id}
+        except Exception:
+            py_logger.exception("Failed to process pipeline run %s", run_id)
+            raise HTTPException(status_code=500, detail="Pipeline processing failed")
+
+    return {"message": f"Ignored event: {event}"}
