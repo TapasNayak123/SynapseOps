@@ -131,6 +131,15 @@ jobs:
             --name ${{ env.EKS_CLUSTER }} \
             --region ${{ env.AWS_REGION }}
 
+      - name: Clean up stuck Helm release
+        run: |
+          STATUS=$(helm status ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o json 2>/dev/null | jq -r '.info.status' 2>/dev/null || echo "not-found")
+          echo "Current Helm release status: $STATUS"
+          if [ "$STATUS" = "pending-install" ] || [ "$STATUS" = "pending-upgrade" ] || [ "$STATUS" = "pending-rollback" ]; then
+            echo "Release is stuck in $STATUS — rolling back..."
+            helm rollback ${{ env.HELM_RELEASE }} 0 -n ${{ env.HELM_NAMESPACE }} || true
+          fi
+
       - name: Deploy with Helm
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
@@ -144,12 +153,12 @@ jobs:
             --set secrets.GITHUB_TOKEN="${{ secrets.TARGET_REPO_TOKEN }}" \
             --set secrets.GITHUB_WEBHOOK_SECRET="${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
             --set env.GITHUB_REPO="${{ vars.TARGET_GITHUB_REPO }}" \
-            --wait --timeout 300s
+            --wait --timeout 600s --atomic
 
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/${{ env.HELM_RELEASE }} \
-            --namespace ${{ env.HELM_NAMESPACE }} --timeout=120s
+            --namespace ${{ env.HELM_NAMESPACE }} --timeout=300s
 
   # ── Stage 4: Post-Deployment Validation ─────────────────────────────────
   post-deploy-validation:
