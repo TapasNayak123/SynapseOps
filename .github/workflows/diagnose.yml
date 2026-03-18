@@ -1,0 +1,87 @@
+name: Diagnose EKS Deployment
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: auth-api-cluster
+  HELM_RELEASE: synapse-ops
+  HELM_NAMESPACE: default
+
+jobs:
+  diagnose:
+    name: Diagnose Cluster
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+
+      - name: Helm release status
+        run: |
+          echo "=== Helm Release ==="
+          helm status ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} || echo "No release found"
+          echo ""
+          helm list -n ${{ env.HELM_NAMESPACE }}
+
+      - name: Pod status
+        run: |
+          echo "=== All Pods ==="
+          kubectl get pods -n ${{ env.HELM_NAMESPACE }} -o wide
+          echo ""
+          echo "=== Deployment ==="
+          kubectl get deployment ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o wide
+          echo ""
+          echo "=== ReplicaSets ==="
+          kubectl get rs -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }}
+
+      - name: Pod details
+        run: |
+          echo "=== Pod Describe ==="
+          kubectl describe pods -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }}
+
+      - name: Pod logs
+        run: |
+          echo "=== Current Logs ==="
+          kubectl logs -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} --tail=100 || true
+          echo ""
+          echo "=== Previous Logs ==="
+          kubectl logs -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} --previous --tail=100 || true
+
+      - name: Service and networking
+        run: |
+          echo "=== Service ==="
+          kubectl get svc ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o yaml
+          echo ""
+          echo "=== Endpoints ==="
+          kubectl get endpoints ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }}
+          echo ""
+          echo "=== Public URL ==="
+          LB=$(kubectl get svc ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          echo "LoadBalancer hostname: $LB"
+
+      - name: Test connectivity from pod
+        run: |
+          POD=$(kubectl get pods -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+          if [ -n "$POD" ]; then
+            echo "Testing /health..."
+            kubectl exec $POD -n ${{ env.HELM_NAMESPACE }} -- python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').read().decode())" || echo "FAILED"
+            echo "Testing /health/ready..."
+            kubectl exec $POD -n ${{ env.HELM_NAMESPACE }} -- python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health/ready').read().decode())" || echo "FAILED"
+            echo "Testing /..."
+            kubectl exec $POD -n ${{ env.HELM_NAMESPACE }} -- python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:5000/'); print(r.status, r.read().decode()[:300])" || echo "FAILED"
+          else
+            echo "No pod found"
+          fi
+
+      - name: Recent events
+        run: |
+          echo "=== Recent Events ==="
+          kubectl get events -n ${{ env.HELM_NAMESPACE }} --sort-by='.lastTimestamp' | tail -30
