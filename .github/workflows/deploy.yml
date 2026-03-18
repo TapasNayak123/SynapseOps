@@ -156,7 +156,7 @@ jobs:
             --set secrets.GITHUB_TOKEN="${{ secrets.TARGET_REPO_TOKEN }}" \
             --set secrets.GITHUB_WEBHOOK_SECRET="${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
             --set env.GITHUB_REPO="${{ vars.TARGET_GITHUB_REPO }}" \
-            --timeout 300s --force
+            --timeout 300s
 
       - name: Wait for rollout
         run: |
