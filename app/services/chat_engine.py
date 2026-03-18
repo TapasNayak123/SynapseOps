@@ -11,6 +11,7 @@ from app.services.incident_analyzer import IncidentAnalyzer
 from app.services.anomaly_detector import AnomalyDetector
 from app.services.sla_tracker import SLATracker
 from app.services.deployment_tracker import DeploymentTracker
+from app.services.k8s_client import K8sClient
 
 logger = structlog.get_logger()
 
@@ -26,6 +27,7 @@ class ChatEngine:
         self.anomaly = AnomalyDetector()
         self.sla = SLATracker()
         self.deployments = DeploymentTracker()
+        self.k8s = K8sClient()
 
     @staticmethod
     def _get_service_info() -> dict:
@@ -73,8 +75,10 @@ class ChatEngine:
         """Check if fetched data contains no meaningful results."""
         if not data or data.get("error"):
             return True
-        # service_info always has content
+        # service_info and infra data always has content
         if "platform" in data or "service_info" in data:
+            return False
+        if "pod_status" in data or "deployment_gate" in data:
             return False
         for key, val in data.items():
             if key in ("hours_back",):
@@ -142,8 +146,14 @@ class ChatEngine:
         if last_intent:
             follow_up_hint = f'\nPrevious intent was: "{last_intent}". If the user\'s message is a short follow-up (e.g., "check for X", "what about Y", "now for Z"), reuse the same intent with the new parameters extracted from the message.'
         prompt = f"""Classify this monitoring query. Return ONLY valid JSON.
-Intents: top_apis, slowest_apis, api_history, correlation_trace, error_analysis, compare, incident_timeline, health_check, sla_check, deployment_check, anomaly_check, recurring_errors, service_info, general
-Use "service_info" when the user asks about the platform itself, what it does, what service is being monitored, capabilities, or general non-data questions like "what is this", "who are we", "what can you do".{follow_up_hint}
+Intents: top_apis, slowest_apis, api_history, correlation_trace, error_analysis, compare, incident_timeline, health_check, sla_check, deployment_check, anomaly_check, recurring_errors, pod_status, pipeline_status, pr_summary, deployment_gate_status, service_info, general
+Intent guide:
+- "pod_status": pod health, restarts, CPU/memory usage, node status, kubernetes resources
+- "pipeline_status": CI/CD pipeline runs, GitHub Actions, build status, workflow failures
+- "pr_summary": pull request reviews, PR analysis, code reviews, recent PRs
+- "deployment_gate_status": deployment gate, held deployments, deploy safety, traffic conditions
+- "service_info": what is this platform, capabilities, what service is monitored
+Use the most specific intent that matches.{follow_up_hint}
 User: "{sanitized}"
 JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_code": null, "start_hour": null, "end_hour": null, "hours_back": 1}}"""
         try:
@@ -211,6 +221,14 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
                 return {"prediction": self.anomaly.predict_error_trend(api, lookback_minutes=mins), "traffic_anomaly": self.anomaly.detect_traffic_anomaly(api, lookback_minutes=mins)}
             if t == "recurring_errors":
                 return {"recurring": self.incidents.detect_recurring_errors(hours_back=max(int(hours), 1))}
+            if t == "pod_status":
+                return self._fetch_pod_status()
+            if t == "pipeline_status":
+                return self._fetch_pipeline_status(hours)
+            if t == "pr_summary":
+                return self._fetch_pr_summary()
+            if t == "deployment_gate_status":
+                return self._fetch_gate_status()
             # General fallback — include service info + quick data summary
             data = {
                 "service_info": self._get_service_info(),
@@ -221,3 +239,95 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
         except Exception as e:
             logger.error("fetch_failed", intent=t, error=str(e))
             return {"error": str(e)}
+
+    # ── New data fetchers for expanded intents ────────────────────────────
+
+    def _fetch_pod_status(self) -> dict:
+        """Fetch Kubernetes pod status, resource usage, and node info."""
+        try:
+            summary = self.k8s.get_all_pods_summary()
+            if summary.get("total_pods", 0) > 0:
+                return {"pod_status": summary}
+            return {"pod_status": "kubectl not available or no pods found"}
+        except Exception as e:
+            logger.warning("k8s_fetch_failed", error=str(e))
+            return {"pod_status": "Kubernetes data unavailable"}
+
+    def _fetch_pipeline_status(self, hours: float) -> dict:
+        """Fetch recent GitHub Actions pipeline runs."""
+        from store import pipeline_store
+        try:
+            # Get from deployment tracker (live GitHub API)
+            runs = self.deployments.get_recent_deployments(hours_back=max(int(hours), 1))
+            # Also get analyzed failures from DynamoDB
+            failures = pipeline_store.all()[:10]
+            failure_list = []
+            for f in failures:
+                failure_list.append({
+                    "repo": f.repo, "run_id": f.run_id, "workflow": f.workflow,
+                    "branch": f.branch, "status": f.status,
+                    "failed_jobs": f.failed_jobs[:3],
+                    "analysis_snippet": (f.analysis or "")[:300],
+                    "autoheal_status": f.autoheal_status,
+                    "autoheal_pr": f.autoheal_pr,
+                })
+            return {
+                "recent_pipeline_runs": runs,
+                "analyzed_failures": failure_list,
+                "total_runs": len(runs),
+                "failed_count": sum(1 for r in runs if r.get("status") == "failure"),
+                "success_count": sum(1 for r in runs if r.get("status") == "success"),
+            }
+        except Exception as e:
+            logger.warning("pipeline_fetch_failed", error=str(e))
+            return {"error": f"Pipeline data unavailable: {e}"}
+
+    def _fetch_pr_summary(self) -> dict:
+        """Fetch recent PR reviews and analysis."""
+        from store import pr_store
+        try:
+            records = pr_store.all()[:10]
+            prs = []
+            for r in records:
+                prs.append({
+                    "repo": r.repo, "pr_number": r.pr_number, "title": r.title,
+                    "author": r.author, "branch": r.branch, "target": r.target,
+                    "risk_level": r.risk_level, "pr_type": r.pr_type,
+                    "priority": r.priority, "summary_snippet": (r.summary or "")[:200],
+                    "files_changed": r.files_changed,
+                    "additions": r.additions, "deletions": r.deletions,
+                })
+            stats = pr_store.stats()
+            return {
+                "recent_prs": prs,
+                "stats": {
+                    "total_reviewed": stats.get("total", 0),
+                    "avg_duration_seconds": stats.get("avg_duration", 0),
+                    "risk_distribution": stats.get("risk_counts", {}),
+                    "type_distribution": stats.get("type_counts", {}),
+                },
+            }
+        except Exception as e:
+            logger.warning("pr_fetch_failed", error=str(e))
+            return {"error": f"PR data unavailable: {e}"}
+
+    def _fetch_gate_status(self) -> dict:
+        """Fetch deployment gate status and held deployments."""
+        try:
+            from app.services.deployment_gate import get_deployment_gate
+            gate = get_deployment_gate()
+            held = gate.get_held_deployments()
+            pending = [h for h in held if not h.get("released")]
+            released = [h for h in held if h.get("released")]
+            return {
+                "deployment_gate": {
+                    "total_held": len(held),
+                    "currently_held": len(pending),
+                    "released": len(released),
+                    "pending_deployments": pending[:5],
+                    "recently_released": released[:5],
+                }
+            }
+        except Exception as e:
+            logger.warning("gate_fetch_failed", error=str(e))
+            return {"error": f"Deployment gate data unavailable: {e}"}

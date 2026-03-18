@@ -349,7 +349,7 @@
         .chat-welcome h4 { font-size: 18px; font-weight: 800; color: #f0f6fc; margin-bottom: 8px; }
         .chat-welcome p { font-size: 14px; color: #6e7681; line-height: 1.6; max-width: 400px; margin: 0 auto; }
 
-        .chat-quick-btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 0 8px; }
+        .chat-quick-btns { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; padding: 0 8px; }
         .chat-quick-btn {
             background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.08);
             border-radius: 12px; padding: 14px 14px; cursor: pointer;
@@ -444,7 +444,7 @@
 
         @media (max-width: 720px) {
             .chat-window { width: 95vw; height: 80vh; }
-            .chat-quick-btns { grid-template-columns: 1fr 1fr; }
+            .chat-quick-btns { grid-template-columns: 1fr 1fr 1fr; }
         }
     </style>
 </head>
@@ -530,10 +530,25 @@
                 <button class="chat-quick-btn" onclick="chatSend(cardQuery('Compare API performance'))">
                     <div class="qicon">⚖️</div><div class="qtitle">Compare Periods</div><div class="qdesc">Today vs yesterday</div>
                 </button>
+                <button class="chat-quick-btn" onclick="chatSend('Show pod status and resource usage')">
+                    <div class="qicon">🐳</div><div class="qtitle">Pod Status</div><div class="qdesc">K8s pods, CPU, memory</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show pipeline status'))">
+                    <div class="qicon">🔧</div><div class="qtitle">Pipeline Status</div><div class="qdesc">CI/CD runs & failures</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend('Show recent PR reviews')">
+                    <div class="qicon">📝</div><div class="qtitle">PR Reviews</div><div class="qdesc">AI code review results</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend('Show deployment gate status')">
+                    <div class="qicon">🚦</div><div class="qtitle">Deploy Gate</div><div class="qdesc">Held & released deploys</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend('What is this service about?')">
+                    <div class="qicon">ℹ️</div><div class="qtitle">About</div><div class="qdesc">Platform & capabilities</div>
+                </button>
             </div>
         </div>
         <div class="chat-win-input">
-            <input type="text" id="chatInput" placeholder="Ask anything about your APIs..." onkeydown="if(event.key==='Enter')chatSend()">
+            <input type="text" id="chatInput" placeholder="Ask about APIs, pods, pipelines, PRs, deployments..." onkeydown="if(event.key==='Enter')chatSend()">
             <button id="chatSendBtn" onclick="chatSend()">Send →</button>
         </div>
     </div>
@@ -567,6 +582,21 @@
                 </button>
                 <button class="chat-quick-btn" onclick="chatSend(cardQuery('Compare API performance'))">
                     <div class="qicon">⚖️</div><div class="qtitle">Compare Periods</div><div class="qdesc">Today vs yesterday</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend('Show pod status and resource usage')">
+                    <div class="qicon">🐳</div><div class="qtitle">Pod Status</div><div class="qdesc">K8s pods, CPU, memory</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show pipeline status'))">
+                    <div class="qicon">🔧</div><div class="qtitle">Pipeline Status</div><div class="qdesc">CI/CD runs & failures</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend('Show recent PR reviews')">
+                    <div class="qicon">📝</div><div class="qtitle">PR Reviews</div><div class="qdesc">AI code review results</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend('Show deployment gate status')">
+                    <div class="qicon">🚦</div><div class="qtitle">Deploy Gate</div><div class="qdesc">Held & released deploys</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend('What is this service about?')">
+                    <div class="qicon">ℹ️</div><div class="qtitle">About</div><div class="qdesc">Platform & capabilities</div>
                 </button>
             </div>`;
 
