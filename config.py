@@ -14,5 +14,3 @@ BEDROCK_MODEL_ID = _s.bedrock_model_id
 TEAMS_WEBHOOK_URL = _s.teams_webhook_url
 APP_BASE_URL = _s.app_base_url
 GITHUB_REPO = _s.github_repo
-GITHUB_REPOS = _s.github_repos_list
-POLL_INTERVAL = _s.poll_interval

@@ -1,4 +1,6 @@
 """Node.js error categorization and GitHub source code fetching."""
+from __future__ import annotations
+
 import re
 import base64
 import structlog

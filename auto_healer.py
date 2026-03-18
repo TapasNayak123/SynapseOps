@@ -13,7 +13,8 @@ from github_client import (
     GITHUB_API, _get_session,
 )
 from config import TEAMS_WEBHOOK_URL, APP_BASE_URL
-from app.services.notifier import _get_http
+from app.services.notifier import _get_http, _WEBHOOK_RETRYABLE
+from app.services.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -262,12 +263,13 @@ def send_autoheal_notification(repo: str, run: dict, fix: dict, result: dict):
     })
 
     try:
-        resp = _get_http().post(
-            TEAMS_WEBHOOK_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        resp.raise_for_status()
-        logger.info("✅ Auto-heal notification sent")
+        _send_autoheal_notification_with_retry(TEAMS_WEBHOOK_URL, payload)
     except Exception:
         logger.exception("❌ Failed to send auto-heal notification")
+
+
+@retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=15.0, retryable_exceptions=_WEBHOOK_RETRYABLE)
+def _send_autoheal_notification_with_retry(webhook_url: str, payload: dict):
+    resp = _get_http().post(webhook_url, json=payload, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    logger.info("✅ Auto-heal notification sent")

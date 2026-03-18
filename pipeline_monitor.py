@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import time
-import threading
 
 from config import TEAMS_WEBHOOK_URL, APP_BASE_URL
 from bedrock_client import invoke_model
@@ -12,21 +10,14 @@ from github_client import gh_headers, GITHUB_API, _get_session
 from store import PipelineRecord, pipeline_store
 from auto_healer import generate_fix, apply_fix, send_autoheal_notification
 from activity_log import activity_log
-from app.services.notifier import _get_http
+from app.services.notifier import _get_http, _WEBHOOK_RETRYABLE
+from app.services.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
 # Track which workflow runs we've already analyzed
 _analyzed_runs: set[str] = set()
 _MAX_ANALYZED = 5000
-
-
-def get_workflow_runs(repo: str, status: str = "failure") -> list:
-    """Fetch recent failed workflow runs."""
-    url = f"{GITHUB_API}/repos/{repo}/actions/runs?status={status}&per_page=10"
-    resp = _get_session().get(url, headers=gh_headers(), timeout=30)
-    resp.raise_for_status()
-    return resp.json().get("workflow_runs", [])
 
 
 def get_run_jobs(repo: str, run_id: int) -> list:
@@ -181,15 +172,16 @@ def send_pipeline_failure_notification(
     }
 
     try:
-        resp = _get_http().post(
-            TEAMS_WEBHOOK_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        resp.raise_for_status()
-        logger.info("✅ Pipeline failure notification sent for run %s", run.get("id"))
+        _send_pipeline_notification_with_retry(TEAMS_WEBHOOK_URL, payload, run)
     except Exception:
         logger.exception("❌ Failed to send pipeline failure notification")
+
+
+@retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=15.0, retryable_exceptions=_WEBHOOK_RETRYABLE)
+def _send_pipeline_notification_with_retry(webhook_url: str, payload: dict, run: dict):
+    resp = _get_http().post(webhook_url, json=payload, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    logger.info("✅ Pipeline failure notification sent for run %s", run.get("id"))
 
 
 def process_failed_run(repo: str, run: dict):
@@ -269,31 +261,3 @@ def process_failed_run(repo: str, run: dict):
 
     except Exception:
         logger.exception("    ❌ Failed to process pipeline run %s", run_id)
-
-
-def poll_pipelines(repos: list, interval: int = 60):
-    """Continuously poll repos for failed pipeline runs."""
-    logger.info("=== Pipeline monitor started for repos: %s (every %ds) ===", repos, interval)
-
-    while True:
-        for repo in repos:
-            try:
-                logger.info("Checking pipelines for %s...", repo)
-                failed_runs = get_workflow_runs(repo, status="failure")
-                logger.info("Found %d failed run(s) in %s", len(failed_runs), repo)
-
-                for run in failed_runs:
-                    process_failed_run(repo, run)
-
-            except Exception:
-                logger.exception("Error checking pipelines for %s", repo)
-
-        time.sleep(interval)
-
-
-def start_pipeline_monitor(repos: list, interval: int = 60):
-    """Start the pipeline monitor in a background thread."""
-    thread = threading.Thread(target=poll_pipelines, args=(repos, interval), daemon=True)
-    thread.start()
-    logger.info("Pipeline monitor thread started")
-    return thread

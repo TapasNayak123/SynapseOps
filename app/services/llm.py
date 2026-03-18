@@ -2,6 +2,8 @@
 
 Supports anthropic, nova, meta, and generic Converse-style models.
 """
+from __future__ import annotations
+
 import json
 import threading
 import boto3
@@ -43,8 +45,24 @@ class LLMService:
         self.model_id = model_id or get_settings().bedrock_model_id
 
     def invoke(self, prompt: str, max_tokens: int = 1024, system: str = None) -> str:
-        """Invoke a Bedrock model, auto-detecting the request format from model_id."""
-        try:
+        """Invoke a Bedrock model with retry, auto-detecting the request format from model_id."""
+        from app.services.retry import retry_with_backoff
+        from botocore.exceptions import ClientError
+
+        # Retryable Bedrock errors: throttling, service unavailable, timeouts
+        _BEDROCK_RETRYABLE = (
+            ClientError,
+            ConnectionError,
+            TimeoutError,
+        )
+
+        @retry_with_backoff(
+            max_retries=3,
+            base_delay=2.0,
+            max_delay=30.0,
+            retryable_exceptions=_BEDROCK_RETRYABLE,
+        )
+        def _call():
             body = self._build_request_body(prompt, max_tokens, system=system)
             resp = self.client.invoke_model(
                 modelId=self.model_id, body=json.dumps(body),
@@ -52,6 +70,9 @@ class LLMService:
             )
             result = json.loads(resp["body"].read())
             return self._parse_response(result)
+
+        try:
+            return _call()
         except Exception as e:
             logger.error("bedrock_invoke_failed", model=self.model_id, error=str(e))
             raise
