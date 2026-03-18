@@ -90,7 +90,8 @@ app.include_router(chat.router)
 app.include_router(alerts.router)
 
 # Static files
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 # ── Health endpoints ──────────────────────────────────────────────────────
