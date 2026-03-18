@@ -81,7 +81,7 @@ class ChatEngine:
         if "pod_status" in data or "deployment_gate" in data:
             return False
         for key, val in data.items():
-            if key in ("hours_back",):
+            if key in ("hours_back", "correlation_id"):
                 continue
             if isinstance(val, list) and len(val) > 0:
                 return False
@@ -123,9 +123,16 @@ class ChatEngine:
 
         # Check for empty results before calling LLM
         hours_used = hours_override if hours_override is not None else int(intent.get("hours_back", 1) or 1)
+        t = intent.get("intent", "general")
+
         if self._is_empty_result(data):
             time_label = self._format_time_range(hours_used)
-            no_data_msg = f"No data found for the selected time range ({time_label}). Try expanding the range or check if the APIs have traffic in this period."
+            # Give specific messages for certain intents instead of generic "no data"
+            if t == "correlation_trace":
+                cid = intent.get("correlation_id", "") or data.get("correlation_id", "")
+                no_data_msg = f"No logs found for correlation ID `{cid}`. Make sure the ID is correct and try expanding the time range (currently {time_label})."
+            else:
+                no_data_msg = f"No data found for the selected time range ({time_label}). Try expanding the range or check if the APIs have traffic in this period."
             return {"response": no_data_msg, "intent": intent, "data": None}
 
         if extra_context:
@@ -134,7 +141,6 @@ class ChatEngine:
         response = self.llm.chat(message, data)
 
         # Hide raw JSON for service_info — it's metadata, not useful to display
-        t = intent.get("intent", "general")
         show_data = None if t == "service_info" else data
 
         return {"response": response, "intent": intent, "data": show_data}
@@ -148,11 +154,13 @@ class ChatEngine:
         prompt = f"""Classify this monitoring query. Return ONLY valid JSON.
 Intents: top_apis, slowest_apis, api_history, correlation_trace, error_analysis, compare, incident_timeline, health_check, sla_check, deployment_check, anomaly_check, recurring_errors, pod_status, pipeline_status, pr_summary, deployment_gate_status, service_info, general
 Intent guide:
+- "correlation_trace": user wants to trace/search/find a specific request by its correlation ID or request ID. Extract the FULL ID string into correlation_id field. The ID may be a UUID like "abc-123-def-456" or any alphanumeric string.
 - "pod_status": pod health, restarts, CPU/memory usage, node status, kubernetes resources
 - "pipeline_status": CI/CD pipeline runs, GitHub Actions, build status, workflow failures
 - "pr_summary": pull request reviews, PR analysis, code reviews, recent PRs
 - "deployment_gate_status": deployment gate, held deployments, deploy safety, traffic conditions
 - "service_info": what is this platform, capabilities, what service is monitored
+IMPORTANT: For correlation_trace, you MUST copy the exact correlation/request ID from the user message into the correlation_id field.
 Use the most specific intent that matches.{follow_up_hint}
 User: "{sanitized}"
 JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_code": null, "start_hour": null, "end_hour": null, "hours_back": 1}}"""
@@ -162,9 +170,35 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
             if text.startswith("```"):
                 text = text.split("\n", 1)[1]
                 text = text.rsplit("```", 1)[0].strip()
-            return json.loads(text)
+            parsed = json.loads(text)
+            # Fallback: if intent is correlation_trace but LLM missed the ID, extract via regex
+            if parsed.get("intent") == "correlation_trace" and not parsed.get("correlation_id"):
+                parsed["correlation_id"] = self._extract_correlation_id(message)
+            return parsed
         except Exception:
+            # If classification fails, check if the message contains a correlation ID pattern
+            cid = self._extract_correlation_id(message)
+            if cid:
+                return {"intent": "correlation_trace", "correlation_id": cid}
             return {"intent": "general"}
+
+    @staticmethod
+    def _extract_correlation_id(message: str) -> str:
+        """Extract a correlation/request ID from user message using regex patterns."""
+        import re
+        # UUID pattern (most common for correlation IDs)
+        m = re.search(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', message)
+        if m:
+            return m.group(0)
+        # Long hex string (e.g. 24+ chars)
+        m = re.search(r'[0-9a-fA-F]{24,}', message)
+        if m:
+            return m.group(0)
+        # Any alphanumeric-dash string that looks like an ID (8+ chars with at least one dash)
+        m = re.search(r'[a-zA-Z0-9]+-[a-zA-Z0-9-]{6,}', message)
+        if m:
+            return m.group(0)
+        return ""
 
     def _fetch_data(self, intent: dict, hours_override: float = None) -> dict:
         t = intent.get("intent", "general")
@@ -192,13 +226,15 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
             if t == "api_history" and api:
                 return {"api_history": self.logs.get_api_history(api, hours_back=hours)}
             if t == "correlation_trace":
-                cid = intent.get("correlation_id", "")
-                return {"trace": self.logs.search_by_correlation_id(cid, hours_back=hours)} if cid else {"error": "No correlation ID"}
+                cid = intent.get("correlation_id", "") or self._extract_correlation_id(str(intent))
+                if not cid:
+                    return {"error": "No correlation ID found in your message. Please include the full ID."}
+                results = self.logs.search_by_correlation_id(cid, hours_back=hours)
+                return {"trace": results, "correlation_id": cid}
             if t == "error_analysis":
                 sc = intent.get("status_code")
                 if sc:
                     return {"errors": self.logs.search_errors(status_code=int(sc), hours_back=hours)}
-                # No specific status code — return both breakdown and recent error logs
                 return {
                     "errors_by_status": self.errors.get_errors_by_status(hours),
                     "recent_errors": self.logs.search_errors(hours_back=hours, size=30),
@@ -239,6 +275,8 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
         except Exception as e:
             logger.error("fetch_failed", intent=t, error=str(e))
             return {"error": str(e)}
+
+    # ── New data fetchers for expanded intents ────────────────────────────
 
     # ── New data fetchers for expanded intents ────────────────────────────
 

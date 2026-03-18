@@ -84,6 +84,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SynapseOps", version="1.0.0", lifespan=lifespan)
 
+# Prevent browser caching of HTML pages (avoids stale chat widget)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        ct = response.headers.get("content-type", "")
+        if "text/html" in ct:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+app.add_middleware(NoCacheHTMLMiddleware)
+
 # Include FastAPI routers (monitoring, chat, alerts)
 app.include_router(metrics.router)
 app.include_router(chat.router)

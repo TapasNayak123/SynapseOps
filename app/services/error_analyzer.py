@@ -70,10 +70,23 @@ class ErrorAnalyzer:
         results = self.cw.query_logs(query, hours_back, limit=50)
 
         categories = {}
-        for row in results:
-            sc = int(row.get("statusCode", 500))
-            cat = self.categorize_status(sc).value
-            categories.setdefault(cat, []).append({
-                "status_code": sc, "count": int(row.get("cnt", 0)), "samples": []
-            })
+        if results:
+            for row in results:
+                sc = int(row.get("statusCode", 500))
+                cat = self.categorize_status(sc).value
+                categories.setdefault(cat, []).append({
+                    "status_code": sc, "count": int(row.get("cnt", 0)), "samples": []
+                })
+        else:
+            # Fallback: aggregate from stream scan
+            from collections import Counter
+            events = [e for e in self.cw._get_recent_events(hours_back)
+                      if self.cw._matches_api_filter(e) and int(e.get("statusCode", 0) or 0) >= 400]
+            counts = Counter(int(e.get("statusCode", 500) or 500) for e in events)
+            for sc, cnt in counts.most_common():
+                cat = self.categorize_status(sc).value
+                categories.setdefault(cat, []).append({
+                    "status_code": sc, "count": cnt, "samples": []
+                })
         return categories
+
