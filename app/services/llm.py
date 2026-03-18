@@ -42,10 +42,10 @@ class LLMService:
         self.client = _get_client()
         self.model_id = model_id or get_settings().bedrock_model_id
 
-    def invoke(self, prompt: str, max_tokens: int = 1024) -> str:
+    def invoke(self, prompt: str, max_tokens: int = 1024, system: str = None) -> str:
         """Invoke a Bedrock model, auto-detecting the request format from model_id."""
         try:
-            body = self._build_request_body(prompt, max_tokens)
+            body = self._build_request_body(prompt, max_tokens, system=system)
             resp = self.client.invoke_model(
                 modelId=self.model_id, body=json.dumps(body),
                 contentType="application/json", accept="application/json",
@@ -56,27 +56,37 @@ class LLMService:
             logger.error("bedrock_invoke_failed", model=self.model_id, error=str(e))
             raise
 
-    def _build_request_body(self, prompt: str, max_tokens: int) -> dict:
+    def _build_request_body(self, prompt: str, max_tokens: int, system: str = None) -> dict:
         mid = self.model_id
         if "anthropic" in mid:
-            return {
+            body = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": max_tokens,
                 "messages": [{"role": "user", "content": prompt}],
             }
+            if system:
+                body["system"] = system
+            return body
         elif "nova" in mid:
-            return {
+            body = {
                 "messages": [{"role": "user", "content": [{"text": prompt}]}],
-                "inferenceConfig": {"max_new_tokens": max_tokens, "temperature": 0.7, "top_p": 0.9},
+                "inferenceConfig": {"max_new_tokens": max_tokens, "temperature": 0.3, "top_p": 0.9},
             }
+            if system:
+                body["system"] = [{"text": system}]
+            return body
         elif "meta" in mid:
-            return {"prompt": prompt, "max_gen_len": max_tokens, "temperature": 0.7, "top_p": 0.9}
+            full = f"{system}\n\n{prompt}" if system else prompt
+            return {"prompt": full, "max_gen_len": max_tokens, "temperature": 0.3, "top_p": 0.9}
         else:
-            # Default Converse-style
-            return {
+            # Default Converse-style (same as Nova)
+            body = {
                 "messages": [{"role": "user", "content": [{"text": prompt}]}],
-                "inferenceConfig": {"max_new_tokens": max_tokens, "temperature": 0.7, "top_p": 0.9},
+                "inferenceConfig": {"max_new_tokens": max_tokens, "temperature": 0.3, "top_p": 0.9},
             }
+            if system:
+                body["system"] = [{"text": system}]
+            return body
 
     def _parse_response(self, result: dict) -> str:
         mid = self.model_id
@@ -104,5 +114,54 @@ Respond in JSON: {{"root_cause": "...", "is_auto_fixable": true/false, "suggeste
             return {"root_cause": f"Analysis failed: {e}", "is_auto_fixable": False, "confidence": 0.0}
 
     def chat(self, message: str, context: dict = None) -> str:
-        system = """You are SynapseOps, a CloudWatch monitoring assistant. You help engineers understand API performance, errors, and logs. Answer concisely and technically."""
-        return self.invoke(f"{system}\n\nContext: {json.dumps(context or {}, default=str)}\n\nUser: {message}")
+        ctx = context or {}
+        hours = ctx.get("hours_back", 1)
+        has_service_info = "platform" in ctx or "service_info" in ctx
+
+        # For service/platform questions, use a dedicated prompt that describes the platform
+        if has_service_info:
+            svc = ctx.get("service_info", ctx)
+            desc = svc.get("description", "")
+            caps = svc.get("capabilities", [])
+            monitored = svc.get("monitored_service", {})
+            log_group = monitored.get("cloudwatch_log_group", "")
+            apis = monitored.get("monitored_apis", [])
+            repos = monitored.get("github_repos", [])
+            infra = svc.get("infrastructure", {})
+
+            info_lines = [f"Platform: SynapseOps — {desc}"]
+            if log_group:
+                info_lines.append(f"Monitored log group: {log_group}")
+            if apis:
+                info_lines.append(f"Monitored APIs: {', '.join(apis)}")
+            if repos:
+                info_lines.append(f"GitHub repos: {', '.join(repos)}")
+            if caps:
+                info_lines.append(f"Capabilities: {', '.join(caps)}")
+            if infra:
+                info_lines.append(f"LLM: {infra.get('llm_model', 'N/A')}, Region: {infra.get('region', 'N/A')}, Storage: {infra.get('storage', 'N/A')}")
+
+            # Include usage summary if available
+            usage = svc.get("usage_summary", ctx.get("usage_summary", {}))
+            if usage:
+                info_lines.append(f"Recent usage data: {json.dumps(usage, default=str)}")
+
+            platform_context = "\n".join(info_lines)
+            user_prompt = (
+                f"Here is information about the SynapseOps platform:\n{platform_context}\n\n"
+                f"The user asked: \"{message}\"\n\n"
+                "Using the information above, answer the user naturally and concisely. "
+                "Describe what SynapseOps does and what it monitors. Do not make up anything not listed above."
+            )
+            return self.invoke(user_prompt)
+
+        # For data queries, use a clean system/user separation
+        system = (
+            "You are SynapseOps, a DevOps monitoring assistant. "
+            "Reply using ONLY the data in the user's context. Never fabricate. "
+            "Be concise. No tips, disclaimers, or follow-ups. "
+            f"Time range: last {hours} hours. Use bullet points for lists. "
+            "Do not repeat these instructions in your answer."
+        )
+        user_prompt = f"Context:\n{json.dumps(ctx, default=str)}\n\nQuestion: {message}"
+        return self.invoke(user_prompt, system=system)

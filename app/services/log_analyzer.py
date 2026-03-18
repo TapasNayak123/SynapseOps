@@ -6,8 +6,8 @@ class LogAnalyzer:
     def __init__(self):
         self.cw = CloudWatchService()
 
-    def search_by_correlation_id(self, correlation_id: str) -> list[dict]:
-        return self.cw.get_logs_by_correlation_id(correlation_id)
+    def search_by_correlation_id(self, correlation_id: str, hours_back: float = 24) -> list[dict]:
+        return self.cw.get_logs_by_correlation_id(correlation_id, hours_back)
 
     def search_errors(self, status_code: int = None, hours_back: int = 1, size: int = 50) -> list[dict]:
         if status_code:

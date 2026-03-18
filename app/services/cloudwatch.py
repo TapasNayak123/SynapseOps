@@ -93,7 +93,7 @@ class CloudWatchService:
             logger.error("query_failed", error=str(e))
             return []
 
-    def query_logs(self, query: str, hours_back: int = 1, limit: int = 100) -> list[dict]:
+    def query_logs(self, query: str, hours_back: float = 1, limit: int = 100) -> list[dict]:
         end = datetime.utcnow()
         return self._query(query, end - timedelta(hours=hours_back), end, limit)
 
@@ -115,7 +115,10 @@ class CloudWatchService:
             total, errors, client_errors = 0, 0, 0
         return {
             "api_path": api_path, "total_requests": total, "error_count": errors,
-            "client_error_count": client_errors, "error_rate": (errors / total * 100) if total else 0.0,
+            "client_error_count": client_errors,
+            "total_error_count": errors + client_errors,
+            "error_rate": ((errors + client_errors) / total * 100) if total else 0.0,
+            "server_error_rate": (errors / total * 100) if total else 0.0,
             "start_time": start.isoformat(), "end_time": end.isoformat(),
         }
 
@@ -139,13 +142,13 @@ class CloudWatchService:
 | filter {F_STATUS} = {status_code} and {self._api_filter} | sort @timestamp desc | limit 50"""
         return self.query_logs(query, hours_back)
 
-    def get_logs_by_correlation_id(self, cid: str) -> list[dict]:
+    def get_logs_by_correlation_id(self, cid: str, hours_back: float = 24) -> list[dict]:
         safe = _sanitize(cid)
         if not safe:
             return []
         query = f"""fields @timestamp, {F_PATH}, {F_METHOD}, {F_STATUS}, {F_DURATION}, {F_CORRELATION}, {F_MESSAGE}, {F_LEVEL}, {F_ERROR_CODE}, {F_STACK}
 | filter {F_CORRELATION} = "{safe}" | sort @timestamp asc | limit 200"""
-        return self.query_logs(query, 24)
+        return self.query_logs(query, hours_back)
 
     def get_top_apis(self, hours_back: int = 1, limit: int = 10) -> list[dict]:
         query = f"""fields {F_PATH}, {F_METHOD} | filter {F_RESPONSE_FILTER} and {self._api_filter}
@@ -170,5 +173,5 @@ class CloudWatchService:
 
     def get_error_logs(self, hours_back: int = 1) -> list[dict]:
         query = f"""fields @timestamp, {F_PATH}, {F_METHOD}, {F_STATUS}, {F_CORRELATION}, {F_MESSAGE}, {F_ERROR_CODE}, {F_STACK}, {F_LEVEL}
-| filter ({F_LEVEL} = "error" or {F_STATUS} >= 500) and {self._api_filter} | sort @timestamp desc | limit 100"""
+| filter ({F_LEVEL} = "error" or {F_STATUS} >= 400) and {self._api_filter} | sort @timestamp desc | limit 100"""
         return self.query_logs(query, hours_back)

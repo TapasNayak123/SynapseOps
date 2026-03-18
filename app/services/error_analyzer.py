@@ -31,12 +31,14 @@ class ErrorAnalyzer:
 
     def analyze_api_errors(self, api_path: str) -> dict:
         metrics = self.cw.get_api_metrics(api_path, period_minutes=1)
-        error_rate = metrics["error_rate"]
+        # Use server_error_rate (5xx only) for threshold alerting
+        error_rate = metrics["server_error_rate"]
         self.db.store_metric_snapshot(metrics)
         self.cache.set(f"metrics:latest:{api_path}", metrics, ttl_seconds=120)
 
         exceeded = error_rate >= self.settings.error_rate_threshold
-        result = {"api_path": api_path, "error_rate": error_rate,
+        result = {"api_path": api_path, "error_rate": metrics["error_rate"],
+                  "server_error_rate": error_rate,
                   "threshold": self.settings.error_rate_threshold, "exceeded": exceeded, "alerted": False}
         if exceeded:
             result["alerted"] = self._maybe_alert(api_path, metrics)

@@ -11,7 +11,7 @@ import logging
 
 from fastapi import FastAPI, Request, Form, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import structlog
 
@@ -118,13 +118,6 @@ def readiness():
         d = False
     return {"status": "ready" if r and d else "degraded",
             "redis": "ok" if r else "error", "dynamodb": "ok" if d else "error"}
-
-
-# ── Chat UI ───────────────────────────────────────────────────────────────
-
-@app.get("/chat")
-def chat_ui():
-    return FileResponse(str(STATIC_DIR / "chat.html"))
 
 
 # ── Dashboard routes ───────────────────────────────────────────────────────

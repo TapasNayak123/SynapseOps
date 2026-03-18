@@ -326,6 +326,20 @@
         }
         .chat-header-btn:hover { background: rgba(88,166,255,0.1); color: #c9d1d9; border-color: rgba(88,166,255,0.2); }
 
+        .chat-time-select {
+            background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.15);
+            border-radius: 8px; padding: 6px 24px 6px 10px; cursor: pointer;
+            font-size: 12px; font-weight: 600; color: #58a6ff;
+            font-family: 'Inter', sans-serif; transition: all 0.2s;
+            outline: none; appearance: none; -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2358a6ff'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 8px center;
+            min-width: 0; width: auto;
+        }
+        .chat-time-select:hover { background-color: rgba(88,166,255,0.15); border-color: rgba(88,166,255,0.3); }
+        .chat-time-select:focus { border-color: rgba(88,166,255,0.4); box-shadow: 0 0 0 2px rgba(88,166,255,0.1); }
+        .chat-time-select option { background: #0d1321; color: #c9d1d9; }
+
         .chat-win-body {
             flex: 1; overflow-y: auto; padding: 20px 24px;
             display: flex; flex-direction: column; gap: 12px;
@@ -467,6 +481,23 @@
                 <p>Ready to help</p>
             </div>
             <div class="chat-header-actions">
+                <select id="chatTimeRange" class="chat-time-select" title="Time range for queries">
+                    <option value="24" selected>⏱ 1d</option>
+                    <option value="0.083">⏱ 5m</option>
+                    <option value="0.25">⏱ 15m</option>
+                    <option value="1">⏱ 1h</option>
+                    <option value="3">⏱ 3h</option>
+                    <option value="6">⏱ 6h</option>
+                    <option value="12">⏱ 12h</option>
+                    <option value="24">⏱ 1d</option>
+                    <option value="48">⏱ 2d</option>
+                    <option value="120">⏱ 5d</option>
+                    <option value="360">⏱ 15d</option>
+                    <option value="720">⏱ 1mo</option>
+                    <option value="2160">⏱ 3mo</option>
+                    <option value="4320">⏱ 6mo</option>
+                    <option value="8760">⏱ 1y</option>
+                </select>
                 <button class="chat-header-btn" onclick="chatReset()" title="New conversation">🔄 New</button>
                 <button class="chat-header-btn" onclick="toggleChat()" title="Close">✕</button>
             </div>
@@ -478,23 +509,26 @@
                 <p>Ask about your APIs, errors, deployments, SLA compliance, or anything else.</p>
             </div>
             <div class="chat-quick-btns">
-                <button class="chat-quick-btn" onclick="chatSend('Show me top 10 APIs')">
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show me top 10 APIs'))">
                     <div class="qicon">📊</div><div class="qtitle">Top APIs</div><div class="qdesc">Most used endpoints</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Show me 500 errors from last hour')">
-                    <div class="qicon">🚨</div><div class="qtitle">Error Analysis</div><div class="qdesc">Recent 500 errors</div>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show me all errors'))">
+                    <div class="qicon">🚨</div><div class="qtitle">Error Analysis</div><div class="qdesc">Recent errors (4xx/5xx)</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Show the slowest API')">
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show the slowest APIs'))">
                     <div class="qicon">🐢</div><div class="qtitle">Slowest APIs</div><div class="qdesc">High latency endpoints</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Any recent deployments causing issues?')">
-                    <div class="qicon">🚀</div><div class="qtitle">Deployments</div><div class="qdesc">Deploy & error correlation</div>
-                </button>
-                <button class="chat-quick-btn" onclick="chatSend('Are there any recurring errors?')">
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show recurring errors'))">
                     <div class="qicon">🔁</div><div class="qtitle">Recurring Errors</div><div class="qdesc">Persistent issues</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Check SLA for /api/products')">
-                    <div class="qicon">📋</div><div class="qtitle">SLA Check</div><div class="qdesc">Compliance status</div>
+                <button class="chat-quick-btn" onclick="prefillChat('Trace correlation ID ')">
+                    <div class="qicon">🔍</div><div class="qtitle">Trace Request</div><div class="qdesc">Follow by correlation ID</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Health score for /api/auth/login'))">
+                    <div class="qicon">💚</div><div class="qtitle">Health Score</div><div class="qdesc">API health score 0-100</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Compare API performance'))">
+                    <div class="qicon">⚖️</div><div class="qtitle">Compare Periods</div><div class="qdesc">Today vs yesterday</div>
                 </button>
             </div>
         </div>
@@ -513,23 +547,26 @@
                 <p>Ask about your APIs, errors, deployments, SLA compliance, or anything else.</p>
             </div>
             <div class="chat-quick-btns">
-                <button class="chat-quick-btn" onclick="chatSend('Show me top 10 APIs')">
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show me top 10 APIs'))">
                     <div class="qicon">📊</div><div class="qtitle">Top APIs</div><div class="qdesc">Most used endpoints</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Show me 500 errors from last hour')">
-                    <div class="qicon">🚨</div><div class="qtitle">Error Analysis</div><div class="qdesc">Recent 500 errors</div>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show me all errors'))">
+                    <div class="qicon">🚨</div><div class="qtitle">Error Analysis</div><div class="qdesc">Recent errors (4xx/5xx)</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Show the slowest API')">
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show the slowest APIs'))">
                     <div class="qicon">🐢</div><div class="qtitle">Slowest APIs</div><div class="qdesc">High latency endpoints</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Any recent deployments causing issues?')">
-                    <div class="qicon">🚀</div><div class="qtitle">Deployments</div><div class="qdesc">Deploy & error correlation</div>
-                </button>
-                <button class="chat-quick-btn" onclick="chatSend('Are there any recurring errors?')">
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Show recurring errors'))">
                     <div class="qicon">🔁</div><div class="qtitle">Recurring Errors</div><div class="qdesc">Persistent issues</div>
                 </button>
-                <button class="chat-quick-btn" onclick="chatSend('Check SLA for /api/products')">
-                    <div class="qicon">📋</div><div class="qtitle">SLA Check</div><div class="qdesc">Compliance status</div>
+                <button class="chat-quick-btn" onclick="prefillChat('Trace correlation ID ')">
+                    <div class="qicon">🔍</div><div class="qtitle">Trace Request</div><div class="qdesc">Follow by correlation ID</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Health score for /api/auth/login'))">
+                    <div class="qicon">💚</div><div class="qtitle">Health Score</div><div class="qdesc">API health score 0-100</div>
+                </button>
+                <button class="chat-quick-btn" onclick="chatSend(cardQuery('Compare API performance'))">
+                    <div class="qicon">⚖️</div><div class="qtitle">Compare Periods</div><div class="qdesc">Today vs yesterday</div>
                 </button>
             </div>`;
 
@@ -567,7 +604,7 @@
         const div = document.createElement('div');
         div.className = 'chat-msg ' + role;
         div.textContent = text;
-        if (data && Object.keys(data).length > 0 && !data.error) {
+        if (data && typeof data === 'object' && Object.keys(data).length > 0 && !data.error) {
             const toggleBtn = document.createElement('button');
             toggleBtn.className = 'chat-data-toggle';
             toggleBtn.onclick = function() { toggleJsonData(this); };
@@ -595,11 +632,42 @@
 
     function hideTyping() { const el = document.getElementById('chatTyping'); if (el) el.remove(); }
 
+    function getSelectedHoursBack() {
+        return parseFloat(document.getElementById('chatTimeRange').value) || 24;
+    }
+
+    function getTimeLabel() {
+        const sel = document.getElementById('chatTimeRange');
+        return sel.options[sel.selectedIndex].text.replace('⏱ ', '');
+    }
+
+    function cardQuery(base) {
+        return base + ' for the last ' + getTimeLabel();
+    }
+
+    function prefillChat(text) {
+        const input = document.getElementById('chatInput');
+        input.value = text;
+        input.focus();
+    }
+
+    let lastQuery = '';
+    let lastQueryBase = '';
+    let lastIntent = '';
+
+    document.getElementById('chatTimeRange').addEventListener('change', function() {
+        if (lastQueryBase && chatHasMessages) {
+            chatSend(cardQuery(lastQueryBase));
+        }
+    });
+
     async function chatSend(text) {
         const input = document.getElementById('chatInput');
         const msg = text || input.value.trim();
         if (!msg || chatLoading) return;
         input.value = '';
+        lastQuery = msg;
+        lastQueryBase = msg.replace(/\s+for the last \S+$/, '');
         chatLoading = true;
         document.getElementById('chatSendBtn').disabled = true;
         appendMsg('user', msg);
@@ -607,11 +675,17 @@
         try {
             const res = await fetch('/api/chat/', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg }),
+                body: JSON.stringify({ message: msg, context: { hours_back: getSelectedHoursBack(), last_intent: lastIntent || '' } }),
             });
-            const result = await res.json();
+            let result;
+            try { result = await res.json(); } catch { result = { response: '⚠️ Invalid response from server.' }; }
             hideTyping();
-            appendMsg('bot', result.response || "Hmm, I couldn't process that.", result.data || null);
+            if (!res.ok) {
+                appendMsg('bot', result.detail || `⚠️ Server error (${res.status}).`);
+            } else {
+                appendMsg('bot', result.response || "Hmm, I couldn't process that.", result.data || null);
+                if (result.intent && result.intent.intent) lastIntent = result.intent.intent;
+            }
         } catch (err) {
             hideTyping();
             appendMsg('bot', '⚠️ Connection error. Is the backend running?');
