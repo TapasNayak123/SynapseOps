@@ -135,9 +135,12 @@ jobs:
         run: |
           STATUS=$(helm status ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o json 2>/dev/null | jq -r '.info.status' 2>/dev/null || echo "not-found")
           echo "Current Helm release status: $STATUS"
-          if [ "$STATUS" = "pending-install" ] || [ "$STATUS" = "pending-upgrade" ] || [ "$STATUS" = "pending-rollback" ]; then
-            echo "Release is stuck in $STATUS — rolling back..."
-            helm rollback ${{ env.HELM_RELEASE }} 0 -n ${{ env.HELM_NAMESPACE }} || true
+          if [ "$STATUS" = "pending-install" ] || [ "$STATUS" = "pending-upgrade" ] || [ "$STATUS" = "pending-rollback" ] || [ "$STATUS" = "failed" ]; then
+            echo "Release is stuck in $STATUS — uninstalling..."
+            helm uninstall ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} --wait || true
+            echo "Waiting for resources to clean up..."
+            kubectl delete deployment ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} --ignore-not-found=true
+            sleep 10
           fi
 
       - name: Deploy with Helm
@@ -153,12 +156,12 @@ jobs:
             --set secrets.GITHUB_TOKEN="${{ secrets.TARGET_REPO_TOKEN }}" \
             --set secrets.GITHUB_WEBHOOK_SECRET="${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
             --set env.GITHUB_REPO="${{ vars.TARGET_GITHUB_REPO }}" \
-            --wait --timeout 600s --atomic
+            --timeout 300s --force
 
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/${{ env.HELM_RELEASE }} \
-            --namespace ${{ env.HELM_NAMESPACE }} --timeout=300s
+            --namespace ${{ env.HELM_NAMESPACE }} --timeout=180s
 
   # ── Stage 4: Post-Deployment Validation ─────────────────────────────────
   post-deploy-validation:
