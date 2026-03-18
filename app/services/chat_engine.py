@@ -80,6 +80,8 @@ class ChatEngine:
             return False
         if "pod_status" in data or "deployment_gate" in data:
             return False
+        if "analyzed_failures" in data or "recent_pipeline_runs" in data:
+            return False
         for key, val in data.items():
             if key in ("hours_back", "correlation_id"):
                 continue
@@ -151,17 +153,35 @@ class ChatEngine:
         follow_up_hint = ""
         if last_intent:
             follow_up_hint = f'\nPrevious intent was: "{last_intent}". If the user\'s message is a short follow-up (e.g., "check for X", "what about Y", "now for Z"), reuse the same intent with the new parameters extracted from the message.'
+        # ── Keyword pre-classification: catch obvious intents the LLM might miss ──
+        msg_lower = message.lower()
+        _KW_MAP = {
+            "pod_status": ["pod", "pods", "cluster", "clusters", "eks", "k8s", "kubernetes",
+                           "node", "nodes", "container", "containers", "kubectl", "namespace",
+                           "running cluster", "cluster detail", "cluster status", "workload",
+                           "cpu usage", "memory usage", "restart"],
+            "pipeline_status": ["pipeline", "pipelines", "workflow", "github action", "build status",
+                                "ci/cd", "cicd", "build fail", "workflow run"],
+            "deployment_gate_status": ["deployment gate", "deploy gate", "held deploy", "release gate"],
+            "pr_summary": ["pull request", "pr review", "code review", "recent pr"],
+        }
+        keyword_hint = ""
+        for intent_name, keywords in _KW_MAP.items():
+            if any(kw in msg_lower for kw in keywords):
+                keyword_hint = f'\nKeyword hint: the message likely matches "{intent_name}" intent.'
+                break
+
         prompt = f"""Classify this monitoring query. Return ONLY valid JSON.
 Intents: top_apis, slowest_apis, api_history, correlation_trace, error_analysis, compare, incident_timeline, health_check, sla_check, deployment_check, anomaly_check, recurring_errors, pod_status, pipeline_status, pr_summary, deployment_gate_status, service_info, general
 Intent guide:
 - "correlation_trace": user wants to trace/search/find a specific request by its correlation ID or request ID. Extract the FULL ID string into correlation_id field. The ID may be a UUID like "abc-123-def-456" or any alphanumeric string.
-- "pod_status": pod health, restarts, CPU/memory usage, node status, kubernetes resources
-- "pipeline_status": CI/CD pipeline runs, GitHub Actions, build status, workflow failures
+- "pod_status": pod health, restarts, CPU/memory usage, node status, kubernetes resources, cluster details, EKS, k8s, running containers, nodes, workloads, infrastructure status
+- "pipeline_status": CI/CD pipeline runs, GitHub Actions, build status, workflow failures, build history
 - "pr_summary": pull request reviews, PR analysis, code reviews, recent PRs
 - "deployment_gate_status": deployment gate, held deployments, deploy safety, traffic conditions
-- "service_info": what is this platform, capabilities, what service is monitored
+- "service_info": what is this platform, capabilities, what service is monitored (ONLY when user asks about the platform itself, NOT about infrastructure)
 IMPORTANT: For correlation_trace, you MUST copy the exact correlation/request ID from the user message into the correlation_id field.
-Use the most specific intent that matches.{follow_up_hint}
+Use the most specific intent that matches.{keyword_hint}{follow_up_hint}
 User: "{sanitized}"
 JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_code": null, "start_hour": null, "end_hour": null, "hours_back": 1}}"""
         try:
@@ -174,6 +194,12 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
             # Fallback: if intent is correlation_trace but LLM missed the ID, extract via regex
             if parsed.get("intent") == "correlation_trace" and not parsed.get("correlation_id"):
                 parsed["correlation_id"] = self._extract_correlation_id(message)
+            # Hard override: if LLM classified as general/service_info but keywords clearly match another intent
+            if parsed.get("intent") in ("general", "service_info") and keyword_hint:
+                for intent_name, keywords in _KW_MAP.items():
+                    if any(kw in msg_lower for kw in keywords):
+                        parsed["intent"] = intent_name
+                        break
             return parsed
         except Exception:
             # If classification fails, check if the message contains a correlation ID pattern
