@@ -321,8 +321,9 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
         """Fetch recent GitHub Actions pipeline runs."""
         from store import pipeline_store
         try:
-            # Get from deployment tracker (live GitHub API)
-            runs = self.deployments.get_recent_deployments(hours_back=max(int(hours), 1))
+            # Use at least 7 days for pipeline lookback — runs are infrequent
+            pipeline_hours = max(int(hours), 168)
+            runs = self.deployments.get_recent_deployments(hours_back=pipeline_hours)
             # Also get analyzed failures from DynamoDB
             failures = pipeline_store.all()[:10]
             failure_list = []

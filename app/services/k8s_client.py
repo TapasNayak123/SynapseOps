@@ -110,7 +110,7 @@ class K8sClient:
         return pods
 
     def get_all_pods_summary(self) -> dict:
-        """Get a summary of all pods in the namespace."""
+        """Get a comprehensive summary: pods, nodes, services, deployments, cluster info."""
         pods = self.get_pod_status()
         usage = self.get_pod_resource_usage()
         usage_map = {p["name"]: p for p in usage}
@@ -119,7 +119,72 @@ class K8sClient:
             pod["cpu_usage"] = u.get("cpu", "N/A")
             pod["memory_usage"] = u.get("memory", "N/A")
         return {
+            "cluster_info": self.get_cluster_info(),
             "total_pods": len(pods),
             "pods": pods,
             "nodes": self.get_node_status(),
+            "services": self.get_services(),
+            "deployments": self.get_deployments(),
         }
+    def get_services(self) -> list[dict]:
+        """Get Kubernetes services in the namespace."""
+        raw = self._run(["get", "services", "-n", self.namespace, "-o", "json"])
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+            svcs = []
+            for item in data.get("items", []):
+                meta = item.get("metadata", {})
+                spec = item.get("spec", {})
+                status = item.get("status", {})
+                lb = status.get("loadBalancer", {}).get("ingress", [])
+                external = lb[0].get("hostname", lb[0].get("ip", "")) if lb else ""
+                svcs.append({
+                    "name": meta.get("name"),
+                    "type": spec.get("type"),
+                    "cluster_ip": spec.get("clusterIP", ""),
+                    "external": external,
+                    "ports": [{"port": p.get("port"), "target": p.get("targetPort"), "protocol": p.get("protocol")} for p in spec.get("ports", [])],
+                })
+            return svcs
+        except (json.JSONDecodeError, KeyError):
+            return []
+
+    def get_deployments(self) -> list[dict]:
+        """Get Kubernetes deployments in the namespace."""
+        raw = self._run(["get", "deployments", "-n", self.namespace, "-o", "json"])
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+            deps = []
+            for item in data.get("items", []):
+                meta = item.get("metadata", {})
+                spec = item.get("spec", {})
+                status = item.get("status", {})
+                deps.append({
+                    "name": meta.get("name"),
+                    "replicas": spec.get("replicas", 0),
+                    "ready": status.get("readyReplicas", 0),
+                    "available": status.get("availableReplicas", 0),
+                    "updated": status.get("updatedReplicas", 0),
+                    "image": spec.get("template", {}).get("spec", {}).get("containers", [{}])[0].get("image", ""),
+                })
+            return deps
+        except (json.JSONDecodeError, KeyError):
+            return []
+
+    def get_cluster_info(self) -> dict:
+        """Get basic cluster info (version, context)."""
+        version_raw = self._run(["version", "--short", "-o", "json"], timeout=5)
+        context_raw = self._run(["config", "current-context"], timeout=5)
+        info = {"context": context_raw or "unknown"}
+        if version_raw:
+            try:
+                v = json.loads(version_raw)
+                info["server_version"] = v.get("serverVersion", {}).get("gitVersion", "")
+                info["client_version"] = v.get("clientVersion", {}).get("gitVersion", "")
+            except (json.JSONDecodeError, KeyError):
+                pass
+        return info
