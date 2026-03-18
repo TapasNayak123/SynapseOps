@@ -255,6 +255,19 @@ jobs:
           kubectl get endpoints ${{ env.HELM_RELEASE }} \
             --namespace ${{ env.HELM_NAMESPACE }}
 
+      - name: Print public URL
+        run: |
+          echo "=== Public Access URL ==="
+          LB_HOST=$(kubectl get svc ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          if [ -z "$LB_HOST" ]; then
+            LB_HOST=$(kubectl get svc ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+          fi
+          if [ -n "$LB_HOST" ]; then
+            echo "🌐 Public URL: http://$LB_HOST"
+          else
+            echo "⚠️ LoadBalancer not yet assigned. Check: kubectl get svc ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }}"
+          fi
+
       - name: Check recent logs
         if: always()
         run: |
