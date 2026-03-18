@@ -161,7 +161,34 @@ jobs:
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/${{ env.HELM_RELEASE }} \
-            --namespace ${{ env.HELM_NAMESPACE }} --timeout=180s
+            --namespace ${{ env.HELM_NAMESPACE }} --timeout=180s || true
+
+      - name: Debug pod status on failure
+        if: always()
+        run: |
+          echo "=== Pod Status ==="
+          kubectl get pods -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o wide
+          echo ""
+          echo "=== Pod Describe ==="
+          kubectl describe pods -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }}
+          echo ""
+          echo "=== Pod Logs ==="
+          kubectl logs -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} --tail=80 || true
+          echo ""
+          echo "=== Previous Pod Logs (if crashed) ==="
+          kubectl logs -l app=${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} --previous --tail=50 || true
+          echo ""
+          echo "=== Events ==="
+          kubectl get events -n ${{ env.HELM_NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
+
+      - name: Verify rollout succeeded
+        run: |
+          READY=$(kubectl get deployment ${{ env.HELM_RELEASE }} -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+          if [ "$READY" != "1" ]; then
+            echo "::error::Deployment not ready. Ready replicas: $READY"
+            exit 1
+          fi
+          echo "Deployment is ready with $READY replica(s)"
 
   # ── Stage 4: Post-Deployment Validation ─────────────────────────────────
   post-deploy-validation:
