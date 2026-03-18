@@ -8,6 +8,7 @@ from pathlib import Path
 import hashlib
 import hmac
 import logging
+import threading
 
 from fastapi import FastAPI, Request, Form, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -25,8 +26,10 @@ from github_client import get_pr_details, get_pr_diff, get_pr_files, post_pr_com
 from agents import supervisor, check_and_generate_description
 from conflict_detector import check_conflicts
 from store import pr_store, pipeline_store
-from pipeline_monitor import process_failed_run, get_run_jobs
+from pipeline_monitor import process_failed_run
 from activity_log import activity_log
+from app.services.deployment_gate import get_deployment_gate
+from app.services.dedup import is_duplicate, pr_key, pipeline_key, deploy_key, delivery_key
 
 structlog.configure(processors=[
     structlog.processors.TimeStamper(fmt="iso"),
@@ -244,6 +247,23 @@ def api_activity(since: int = Query(0)):
     return {"entries": activity_log.to_dicts(entries), "cursor": cursor}
 
 
+# ── Deployment Gate API ──────────────────────────────────────────────────
+
+@app.get("/api/deployment-gate/status")
+def deployment_gate_status():
+    """Get current deployment gate analysis and held deployments."""
+    gate = get_deployment_gate()
+    analysis = gate._analyze_current_conditions()
+    held = gate.get_held_deployments()
+    return {"current_conditions": analysis, "held_deployments": held}
+
+
+@app.get("/api/deployment-gate/held")
+def deployment_gate_held():
+    """List all held deployments."""
+    return get_deployment_gate().get_held_deployments()
+
+
 # ── PR Action endpoints (Teams card callbacks) ───────────────────────────
 
 @app.get("/action/approve/{repo:path}/{pr_number:int}", response_class=HTMLResponse)
@@ -332,6 +352,83 @@ async def reject_pr(request: Request):
 
 # ── GitHub Webhook ────────────────────────────────────────────────────────
 
+# ── Background processing helpers ─────────────────────────────────────────
+
+def _run_in_background(fn, *args):
+    """Spawn a daemon thread to run *fn* so the webhook returns 202 immediately."""
+    t = threading.Thread(target=fn, args=args, daemon=True)
+    t.start()
+
+
+def _process_pr(repo_full_name, pr_number, pr_payload):
+    """Heavy PR analysis pipeline — runs in a background thread."""
+    try:
+        py_logger.info("Background: analysing PR #%s on %s", pr_number, repo_full_name)
+        pr_details = get_pr_details(repo_full_name, pr_number)
+        diff = get_pr_diff(repo_full_name, pr_number)
+        files = get_pr_files(repo_full_name, pr_number)
+
+        check_and_generate_description(pr_details, diff, files, repo_full_name, pr_number)
+        check_conflicts(
+            repo_full_name, pr_number, files,
+            pr_title=pr_details.get("title", ""),
+            pr_author=pr_details.get("user", {}).get("login", ""),
+        )
+        summary = supervisor(pr_details, diff, files, repo_full_name, pr_number)
+        post_pr_comment(repo_full_name, pr_number, summary)
+        py_logger.info("Background: finished PR #%s on %s", pr_number, repo_full_name)
+    except Exception:
+        py_logger.exception("Background: failed processing PR #%s on %s", pr_number, repo_full_name)
+
+
+def _process_pipeline(repo_full_name, run):
+    """Handle a failed workflow run — runs in a background thread."""
+    try:
+        py_logger.info("Background: processing pipeline failure %s run %s", repo_full_name, run.get("id"))
+        process_failed_run(repo_full_name, run)
+        py_logger.info("Background: finished pipeline failure %s run %s", repo_full_name, run.get("id"))
+    except Exception:
+        py_logger.exception("Background: failed processing pipeline %s run %s", repo_full_name, run.get("id"))
+
+
+def _process_deployment_gate(repo_full_name, run):
+    """Evaluate deployment gate for a successful workflow run — runs in a background thread."""
+    try:
+        gate = get_deployment_gate()
+        run_id = run.get("id", 0)
+        py_logger.info("Background: evaluating deployment gate for %s run %s", repo_full_name, run_id)
+        gate.evaluate(
+            repo=repo_full_name,
+            run_id=run_id,
+            workflow=run.get("name", "N/A"),
+            branch=run.get("head_branch", "N/A"),
+            commit_sha=run.get("head_sha", "")[:8],
+            sender=run.get("actor", {}).get("login", "unknown"),
+        )
+        py_logger.info("Background: finished deployment gate for %s run %s", repo_full_name, run_id)
+    except Exception:
+        py_logger.exception("Background: deployment gate failed for %s run %s", repo_full_name, run.get("id"))
+
+
+def _process_deployment_event(repo_full_name, deployment, sender):
+    """Evaluate deployment gate for a deployment event — runs in a background thread."""
+    try:
+        gate = get_deployment_gate()
+        dep_id = deployment.get("id", 0)
+        py_logger.info("Background: evaluating deployment event for %s id %s", repo_full_name, dep_id)
+        gate.evaluate(
+            repo=repo_full_name,
+            run_id=dep_id,
+            workflow=deployment.get("task", "deployment"),
+            branch=deployment.get("ref", "N/A"),
+            commit_sha=deployment.get("sha", "")[:8],
+            sender=sender,
+        )
+        py_logger.info("Background: finished deployment event for %s id %s", repo_full_name, dep_id)
+    except Exception:
+        py_logger.exception("Background: deployment event failed for %s", repo_full_name)
+
+
 def _verify_signature(payload: bytes, signature: str) -> bool:
     if not GITHUB_WEBHOOK_SECRET:
         py_logger.warning("GITHUB_WEBHOOK_SECRET not set — skipping signature verification")
@@ -342,13 +439,19 @@ def _verify_signature(payload: bytes, signature: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
-@app.post("/webhook")
+@app.post("/webhook", status_code=202)
 async def webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256", "")
     if not _verify_signature(body, signature):
         py_logger.warning("Invalid webhook signature")
         raise HTTPException(status_code=403, detail="Invalid signature")
+
+    # ── Delivery-level dedup (catches exact GitHub retries) ───────────
+    gh_delivery = request.headers.get("X-GitHub-Delivery", "")
+    if gh_delivery and is_duplicate(delivery_key(gh_delivery)):
+        py_logger.info("Duplicate webhook delivery %s — skipping", gh_delivery)
+        return {"message": "Duplicate delivery, already processed"}
 
     event = request.headers.get("X-GitHub-Event", "")
     payload = await request.json()
@@ -362,26 +465,15 @@ async def webhook(request: Request):
         pr = payload["pull_request"]
         repo_full_name = payload["repository"]["full_name"]
         pr_number = pr["number"]
+        head_sha = pr["head"]["sha"]
 
-        py_logger.info("Processing PR #%s on %s (action=%s)", pr_number, repo_full_name, action)
+        if is_duplicate(pr_key(repo_full_name, pr_number, head_sha)):
+            py_logger.info("Duplicate PR event %s #%s @ %s — skipping", repo_full_name, pr_number, head_sha[:8])
+            return {"message": "Already processed this PR at this commit"}
 
-        try:
-            pr_details = get_pr_details(repo_full_name, pr_number)
-            diff = get_pr_diff(repo_full_name, pr_number)
-            files = get_pr_files(repo_full_name, pr_number)
-
-            check_and_generate_description(pr_details, diff, files, repo_full_name, pr_number)
-            check_conflicts(repo_full_name, pr_number, files,
-                            pr_title=pr.get("title", ""),
-                            pr_author=pr.get("user", {}).get("login", ""))
-
-            summary = supervisor(pr_details, diff, files, repo_full_name, pr_number)
-            post_pr_comment(repo_full_name, pr_number, summary)
-            py_logger.info("Posted AI summary on PR #%s", pr_number)
-            return {"message": "Summary posted", "pr": pr_number}
-        except Exception:
-            py_logger.exception("Failed to process PR #%s", pr_number)
-            raise HTTPException(status_code=500, detail="Processing failed")
+        py_logger.info("Accepted PR #%s on %s (action=%s) — processing in background", pr_number, repo_full_name, action)
+        _run_in_background(_process_pr, repo_full_name, pr_number, pr)
+        return {"message": "Accepted, processing in background", "pr": pr_number}
 
     # ── Workflow Run events (pipeline monitoring) ─────────────────────
     if event == "workflow_run":
@@ -389,20 +481,47 @@ async def webhook(request: Request):
         run = payload.get("workflow_run", {})
         conclusion = run.get("conclusion", "")
 
+        # Deployment gate: intercept completed successful workflow runs on main/master
+        if action == "completed" and conclusion == "success":
+            repo_full_name = payload["repository"]["full_name"]
+            branch = run.get("head_branch", "")
+            if branch in ("main", "master", "production"):
+                run_id = run.get("id", 0)
+                if is_duplicate(deploy_key(repo_full_name, run_id)):
+                    py_logger.info("Duplicate deployment gate event %s run %s — skipping", repo_full_name, run_id)
+                    return {"message": "Already evaluated this deployment"}
+
+                py_logger.info("Accepted deployment gate for %s run %s — processing in background", repo_full_name, run_id)
+                _run_in_background(_process_deployment_gate, repo_full_name, run)
+                return {"message": "Accepted, evaluating deployment gate in background", "run_id": run_id}
+
         if action != "completed" or conclusion != "failure":
             return {"message": f"Ignored workflow_run action={action} conclusion={conclusion}"}
 
         repo_full_name = payload["repository"]["full_name"]
         run_id = run.get("id")
 
-        py_logger.info("Pipeline failure detected: %s — %s (run %s)",
-                       repo_full_name, run.get("name"), run_id)
+        if is_duplicate(pipeline_key(repo_full_name, run_id)):
+            py_logger.info("Duplicate pipeline event %s run %s — skipping", repo_full_name, run_id)
+            return {"message": "Already processed this pipeline failure"}
 
-        try:
-            process_failed_run(repo_full_name, run)
-            return {"message": "Pipeline failure processed", "run_id": run_id}
-        except Exception:
-            py_logger.exception("Failed to process pipeline run %s", run_id)
-            raise HTTPException(status_code=500, detail="Pipeline processing failed")
+        py_logger.info("Accepted pipeline failure %s run %s — processing in background", repo_full_name, run_id)
+        _run_in_background(_process_pipeline, repo_full_name, run)
+        return {"message": "Accepted, processing pipeline failure in background", "run_id": run_id}
+
+    # ── Deployment events ─────────────────────────────────────────────
+    if event == "deployment":
+        repo_full_name = payload["repository"]["full_name"]
+        deployment = payload.get("deployment", {})
+        sender = payload.get("sender", {}).get("login", "unknown")
+        dep_id = deployment.get("id", 0)
+
+        if is_duplicate(deploy_key(repo_full_name, dep_id)):
+            py_logger.info("Duplicate deployment event %s id %s — skipping", repo_full_name, dep_id)
+            return {"message": "Already evaluated this deployment"}
+
+        py_logger.info("Accepted deployment event %s — processing in background", repo_full_name)
+        _run_in_background(_process_deployment_event, repo_full_name, deployment, sender)
+        return {"message": "Accepted, evaluating deployment in background"}
 
     return {"message": f"Ignored event: {event}"}

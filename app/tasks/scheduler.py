@@ -124,6 +124,12 @@ def hourly_rollup():
 def start_scheduler():
     settings = get_settings()
     scheduler.add_listener(_on_error, EVENT_JOB_ERROR)
+
+    from app.services.deployment_gate import get_deployment_gate
+
+    def recheck_held_deployments():
+        get_deployment_gate().recheck_held_deployments()
+
     jobs = [
         (monitor_error_rates, "interval", {"seconds": settings.monitoring_interval_seconds}, "error_monitor"),
         (monitor_slow_apis, "interval", {"minutes": 5}, "slow_monitor"),
@@ -131,6 +137,7 @@ def start_scheduler():
         (run_recurring_error_check, "interval", {"hours": 1}, "recurring"),
         (run_sla_check, "interval", {"hours": 1}, "sla"),
         (hourly_rollup, "interval", {"hours": 1}, "rollup"),
+        (recheck_held_deployments, "interval", {"seconds": 120}, "deployment_gate_recheck"),
     ]
     for func, trigger, kwargs, job_id in jobs:
         scheduler.add_job(func, trigger, **kwargs, id=job_id, replace_existing=True, max_instances=1, coalesce=True)
