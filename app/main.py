@@ -272,6 +272,27 @@ def api_activity(since: int = Query(0)):
     return {"entries": activity_log.to_dicts(entries), "cursor": cursor}
 
 
+@app.get("/api/pipelines")
+def api_pipelines():
+    """Get pipeline data for AJAX updates."""
+    records = pipeline_store.all()
+    stats = pipeline_store.stats()
+    return {
+        "pipelines": [
+            {
+                "repo": r.repo,
+                "run_id": r.run_id,
+                "workflow": r.workflow,
+                "status": r.status,
+                "conclusion": r.conclusion,
+                "timestamp": r.timestamp,
+            }
+            for r in records[:20]  # Limit to recent 20
+        ],
+        "stats": stats
+    }
+
+
 # ── Deployment Gate API ──────────────────────────────────────────────────
 
 @app.get("/api/deployment-gate/status")

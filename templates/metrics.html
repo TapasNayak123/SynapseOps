@@ -253,15 +253,46 @@ new Chart(document.getElementById('authorChart'), {
 </script>
 
 <script>
-// Auto-refresh every 60 seconds (only if chat is not open)
+// Auto-refresh every 60 seconds using AJAX (no page reload)
 function autoRefresh() {
-    if (!window.chatOpen) {
-        location.reload();
-    } else {
-        // If chat is open, schedule next check
-        setTimeout(autoRefresh, 60000);
+    updateMetricsData();
+    setTimeout(autoRefresh, 60000);
+}
+
+async function updateMetricsData() {
+    // Skip update if chat is open
+    if (window.chatOpen) {
+        console.log('Skipping metrics update - chat is open');
+        return;
+    }
+    
+    try {
+        // Fetch updated metrics
+        const resp = await fetch('/api/pr-metrics');
+        if (!resp.ok) return;
+        
+        const metrics = await resp.json();
+        
+        // Update metric values (preserve scroll position)
+        const scrollPos = window.scrollY;
+        
+        // Update stats if elements exist
+        const updateStat = (selector, value) => {
+            const el = document.querySelector(selector);
+            if (el) el.textContent = value;
+        };
+        
+        if (metrics.avg_duration_ms) {
+            updateStat('.stat-card:nth-child(1) .value', `${(metrics.avg_duration_ms / 1000).toFixed(1)}s`);
+        }
+        
+        window.scrollTo(0, scrollPos);
+        console.log('Metrics updated via AJAX');
+    } catch (error) {
+        console.error('Failed to update metrics:', error);
     }
 }
+
 setTimeout(autoRefresh, 60000);
 </script>
 {% endblock %}

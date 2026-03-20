@@ -613,12 +613,87 @@
             void win.offsetHeight;
             win.classList.add('open');
             setTimeout(() => document.getElementById('chatInput').focus(), 150);
+            
+            // Prevent any page navigation or refresh while chat is open
+            preventNavigationWhileChatOpen();
         } else {
             win.classList.remove('open');
             overlay.classList.remove('open');
             // After transition ends, hide completely
             setTimeout(() => { if (!chatOpen) win.style.display = 'none'; }, 300);
+            
+            // Re-enable navigation
+            allowNavigation();
         }
+    }
+
+    // Prevent navigation and refresh while chat is open
+    function preventNavigationWhileChatOpen() {
+        // Prevent beforeunload
+        window.addEventListener('beforeunload', preventUnload);
+        
+        // Intercept all link clicks
+        document.addEventListener('click', interceptLinks, true);
+        
+        // Prevent form submissions
+        document.addEventListener('submit', preventFormSubmit, true);
+    }
+
+    function allowNavigation() {
+        window.removeEventListener('beforeunload', preventUnload);
+        document.removeEventListener('click', interceptLinks, true);
+        document.removeEventListener('submit', preventFormSubmit, true);
+    }
+
+    function preventUnload(e) {
+        if (chatOpen && chatHasMessages) {
+            e.preventDefault();
+            e.returnValue = 'You have an active chat session. Are you sure you want to leave?';
+            return e.returnValue;
+        }
+    }
+
+    function interceptLinks(e) {
+        if (!chatOpen) return;
+        
+        // Find if click is on a link or inside a link
+        let target = e.target;
+        while (target && target !== document) {
+            if (target.tagName === 'A' && target.href) {
+                // Allow links that open in new tab
+                if (target.target === '_blank') return;
+                
+                // Prevent navigation
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Show warning
+                if (confirm('Close chat to navigate to this page?')) {
+                    const href = target.href;
+                    toggleChat();
+                    setTimeout(() => window.location.href = href, 300);
+                }
+                return false;
+            }
+            target = target.parentElement;
+        }
+    }
+
+    function preventFormSubmit(e) {
+        if (!chatOpen) return;
+        
+        // Allow chat form submissions
+        if (e.target.closest('#chatWindow')) return;
+        
+        // Prevent other form submissions
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (confirm('Close chat to submit this form?')) {
+            toggleChat();
+            setTimeout(() => e.target.submit(), 300);
+        }
+        return false;
     }
 
     // Close on overlay click only
