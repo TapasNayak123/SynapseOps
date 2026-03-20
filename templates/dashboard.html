@@ -79,7 +79,15 @@
 </div>
 
 <script>
-// Auto-refresh every 30 seconds
-setTimeout(() => { if (!window.chatOpen) location.reload(); }, 30000);
+// Auto-refresh every 30 seconds (only if chat is not open)
+function autoRefresh() {
+    if (!window.chatOpen) {
+        location.reload();
+    } else {
+        // If chat is open, schedule next check
+        setTimeout(autoRefresh, 30000);
+    }
+}
+setTimeout(autoRefresh, 30000);
 </script>
 {% endblock %}

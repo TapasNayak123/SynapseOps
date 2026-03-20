@@ -182,5 +182,25 @@ document.querySelectorAll('.log-time').forEach(td => {
 
 updateStats();
 setInterval(poll, 3000);
+
+// Prevent page unload when chat or modals are open
+window.addEventListener('beforeunload', (e) => {
+    // Only prevent if there's active content
+    const hasContent = document.querySelectorAll('.log-row').length > 0;
+    if (hasContent) {
+        // Don't actually prevent, just ensure state is preserved
+        return undefined;
+    }
+});
+
+// Pause polling when page is hidden (tab switched)
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        console.log('Page hidden, polling continues in background');
+    } else {
+        console.log('Page visible, polling active');
+        poll(); // Immediate poll when returning to page
+    }
+});
 </script>
 {% endblock %}

@@ -252,5 +252,16 @@ new Chart(document.getElementById('authorChart'), {
 });
 </script>
 
-<script>setTimeout(() => { if (!window.chatOpen) location.reload(); }, 60000);</script>
+<script>
+// Auto-refresh every 60 seconds (only if chat is not open)
+function autoRefresh() {
+    if (!window.chatOpen) {
+        location.reload();
+    } else {
+        // If chat is open, schedule next check
+        setTimeout(autoRefresh, 60000);
+    }
+}
+setTimeout(autoRefresh, 60000);
+</script>
 {% endblock %}
