@@ -230,28 +230,42 @@ def process_failed_run(repo: str, run: dict):
         # --- Auto-heal attempt ---
         logger.info("    🔧 Attempting auto-heal...")
         activity_log.emit("Auto-Healer", "started", "Generating fix from failure logs...", repo=repo)
-        fix = generate_fix(repo, run, failed_jobs, logs)
+        
+        try:
+            fix = generate_fix(repo, run, failed_jobs, logs)
+            
+            logger.info("    Auto-heal analysis: fixable=%s, files=%d", 
+                       fix.get("fixable"), len(fix.get("files", [])))
+            
+            if fix.get("fixable") and fix.get("files"):
+                branch = run.get("head_branch", "main")
+                result = apply_fix(repo, branch, fix, run_id=run_id)
 
-        if fix.get("fixable") and fix.get("files"):
-            branch = run.get("head_branch", "main")
-            result = apply_fix(repo, branch, fix, run_id=run_id)
+                if result.get("pr_url"):
+                    record.autoheal_pr = result["pr_url"]
+                    record.autoheal_status = "fix_applied"
+                    logger.info("    ✅ Auto-heal PR created: %s", result["pr_url"])
+                    activity_log.emit("Auto-Healer", "completed", 
+                                    f"Fix pushed to {branch} — {len(result.get('files_changed', []))} file(s)", 
+                                    repo=repo)
+                else:
+                    record.autoheal_status = "fix_failed"
+                    logger.warning("    ⚠️ Auto-heal: no files were committed")
+                    activity_log.emit("Auto-Healer", "error", "Fix generated but no files committed", repo=repo)
 
-            if result.get("pr_url"):
-                record.autoheal_pr = result["pr_url"]
-                record.autoheal_status = "fix_applied"
-                logger.info("    ✅ Auto-heal PR created: %s", result["pr_url"])
-                activity_log.emit("Auto-Healer", "completed", f"Fix pushed to {branch} — {len(result.get('files_changed', []))} file(s)", repo=repo)
+                send_autoheal_notification(repo, run, fix, result)
             else:
-                record.autoheal_status = "fix_failed"
-                logger.warning("    ⚠️ Auto-heal: no files were committed")
-                activity_log.emit("Auto-Healer", "error", "Fix generated but no files committed", repo=repo)
-
-            send_autoheal_notification(repo, run, fix, result)
-        else:
-            record.autoheal_status = "not_fixable"
-            logger.info("    ℹ️ Auto-heal: issue not auto-fixable — %s", fix.get("explanation", ""))
-            activity_log.emit("Auto-Healer", "completed", f"Not auto-fixable: {fix.get('explanation', 'N/A')[:100]}", repo=repo)
-            send_autoheal_notification(repo, run, fix, {"pr_url": "", "files_changed": []})
+                record.autoheal_status = "not_fixable"
+                explanation = fix.get("explanation", "Unknown reason")
+                logger.info("    ℹ️ Auto-heal: issue not auto-fixable — %s", explanation)
+                activity_log.emit("Auto-Healer", "completed", 
+                                f"Not auto-fixable: {explanation[:100]}", repo=repo)
+                send_autoheal_notification(repo, run, fix, {"pr_url": "", "files_changed": []})
+        
+        except Exception as e:
+            logger.exception("    ❌ Auto-heal failed with exception")
+            record.autoheal_status = "error"
+            activity_log.emit("Auto-Healer", "error", f"Exception: {str(e)[:100]}", repo=repo)
 
         _analyzed_runs.add(key)
         # Prevent unbounded memory growth
