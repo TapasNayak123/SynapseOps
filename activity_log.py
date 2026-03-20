@@ -7,6 +7,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import Optional, List, Tuple
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
@@ -38,7 +39,7 @@ class ActivityLog:
     MAX_MEMORY = 500  # in-memory cap for fast polling
 
     def __init__(self):
-        self._entries: list[LogEntry] = []
+        self._entries: List[LogEntry] = []
         self._lock = threading.Lock()
         self._counter = 0
         self._loop = None
@@ -158,11 +159,11 @@ class ActivityLog:
         """Store main event loop reference for cross-thread WS broadcasting."""
         self._loop = loop
 
-    def all(self) -> list[LogEntry]:
+    def all(self) -> List[LogEntry]:
         with self._lock:
             return list(self._entries)
 
-    def since(self, after_index: int) -> tuple[list[LogEntry], int]:
+    def since(self, after_index: int) -> Tuple[List[LogEntry], int]:
         """Return entries added after `after_index` and the current index."""
         with self._lock:
             total = self._counter
@@ -172,7 +173,7 @@ class ActivityLog:
             skip = max(0, count - (total - after_index))
             return list(self._entries[skip:]), total
 
-    def to_dicts(self, entries: list[LogEntry] | None = None) -> list[dict]:
+    def to_dicts(self, entries: Optional[List[LogEntry]] = None) -> List[dict]:
         items = entries if entries is not None else self.all()
         return [_entry_to_dict(e) for e in items]
 

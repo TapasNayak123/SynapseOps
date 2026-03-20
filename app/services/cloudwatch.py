@@ -12,6 +12,7 @@ import boto3
 import structlog
 from collections import Counter
 from datetime import datetime, timedelta
+from typing import Optional, List, Dict
 from botocore.config import Config as BotoConfig
 from app.config import get_settings
 
@@ -55,7 +56,7 @@ def _sanitize(value: str) -> str:
     return re.sub(r'["\'\\\n\r\t|;]', '', value)[:500]
 
 
-def _parse_event(event: dict) -> dict | None:
+def _parse_event(event: Dict) -> Optional[Dict]:
     """Parse a raw CloudWatch log event into a structured dict."""
     try:
         data = _json.loads(event["message"])
@@ -82,7 +83,7 @@ class CloudWatchService:
     # share the same cache. This is safe because all instances use the same log group
     # (configured via settings). If multiple log groups were needed, this would need
     # to be keyed by log_group.
-    _stream_cache: list[dict] = []
+    _stream_cache: List[Dict] = []
     _stream_cache_ts: float = 0
     _STREAM_CACHE_TTL = 60  # seconds
 
@@ -100,7 +101,7 @@ class CloudWatchService:
 
     # ── Core query helpers ────────────────────────────────────────────────
 
-    def _query(self, query: str, start: datetime, end: datetime, limit: int = 100) -> list[dict]:
+    def _query(self, query: str, start: datetime, end: datetime, limit: int = 100) -> List[Dict]:
         try:
             resp = self.client.start_query(
                 logGroupName=self.log_group,
@@ -128,13 +129,13 @@ class CloudWatchService:
             logger.error("query_failed", error=str(e))
             return []
 
-    def query_logs(self, query: str, hours_back: float = 1, limit: int = 100) -> list[dict]:
+    def query_logs(self, query: str, hours_back: float = 1, limit: int = 100) -> List[Dict]:
         end = datetime.utcnow()
         return self._query(query, end - timedelta(hours=hours_back), end, limit)
 
     # ── Universal stream scan fallback ────────────────────────────────────
 
-    def _get_recent_events(self, hours_back: float = 24) -> list[dict]:
+    def _get_recent_events(self, hours_back: float = 24) -> List[Dict]:
         """Fetch and cache recent parsed log events directly from streams.
         Bypasses Insights indexing delay. Cached for 60s to avoid repeated API calls."""
         now = time.time()
@@ -239,7 +240,7 @@ class CloudWatchService:
                     "max_latency_ms": max(durations), "p99_latency_ms": durations[p99_idx]}
         return {"api_path": api_path, "avg_latency_ms": 0, "max_latency_ms": 0, "p99_latency_ms": 0}
 
-    def get_error_logs_by_status(self, status_code: int, hours_back: int = 1) -> list[dict]:
+    def get_error_logs_by_status(self, status_code: int, hours_back: int = 1) -> List[Dict]:
         query = f"""fields @timestamp, {F_PATH}, {F_METHOD}, {F_STATUS}, {F_CORRELATION}, {F_MESSAGE}, {F_ERROR_CODE}, {F_STACK}
 | filter {F_STATUS} = {status_code} and {self._api_filter} | sort @timestamp desc | limit 50"""
         results = self.query_logs(query, hours_back)
@@ -248,7 +249,7 @@ class CloudWatchService:
         return [e for e in self._get_recent_events(hours_back)
                 if e.get(F_STATUS) == str(status_code) and self._matches_api_filter(e)][:50]
 
-    def get_logs_by_correlation_id(self, cid: str, hours_back: float = 24) -> list[dict]:
+    def get_logs_by_correlation_id(self, cid: str, hours_back: float = 24) -> List[Dict]:
         safe = _sanitize(cid)
         if not safe:
             return []
@@ -262,7 +263,7 @@ class CloudWatchService:
         matches.sort(key=lambda e: e["@timestamp"])
         return matches
 
-    def get_top_apis(self, hours_back: int = 1, limit: int = 10) -> list[dict]:
+    def get_top_apis(self, hours_back: int = 1, limit: int = 10) -> List[Dict]:
         query = f"""fields {F_PATH}, {F_METHOD} | filter {F_RESPONSE_FILTER} and {self._api_filter}
 | stats count(*) as request_count by {F_PATH}, {F_METHOD} | sort request_count desc | limit {limit}"""
         results = self.query_logs(query, hours_back)
@@ -277,7 +278,7 @@ class CloudWatchService:
             for (path, method), cnt in counts.most_common(limit)
         ]
 
-    def get_slowest_apis(self, hours_back: int = 1, limit: int = 10) -> list[dict]:
+    def get_slowest_apis(self, hours_back: int = 1, limit: int = 10) -> List[Dict]:
         query = f"""fields {F_PATH}, {F_METHOD}, {F_DURATION}
 | filter {F_MESSAGE} = "Request completed" and ispresent({F_DURATION}) and {self._api_filter}
 | parse {F_DURATION} /(?<d>\\d+)/
@@ -307,7 +308,7 @@ class CloudWatchService:
         rows.sort(key=lambda r: float(r["avg_latency"]), reverse=True)
         return rows[:limit]
 
-    def get_api_history(self, api_path: str, hours_back: int = 24) -> list[dict]:
+    def get_api_history(self, api_path: str, hours_back: int = 24) -> List[Dict]:
         path = _sanitize(api_path)
         if not path:
             return []
@@ -319,7 +320,7 @@ class CloudWatchService:
         return [e for e in self._get_recent_events(hours_back)
                 if path in e.get(F_PATH, "") and self._is_response_event(e)][:100]
 
-    def get_error_logs(self, hours_back: int = 1) -> list[dict]:
+    def get_error_logs(self, hours_back: int = 1) -> List[Dict]:
         query = f"""fields @timestamp, {F_PATH}, {F_METHOD}, {F_STATUS}, {F_CORRELATION}, {F_MESSAGE}, {F_ERROR_CODE}, {F_STACK}, {F_LEVEL}
 | filter ({F_LEVEL} = "error" or {F_STATUS} >= 400) and {self._api_filter} | sort @timestamp desc | limit 100"""
         results = self.query_logs(query, hours_back)

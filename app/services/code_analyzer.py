@@ -5,6 +5,7 @@ import re
 import base64
 import structlog
 from enum import Enum
+from typing import Optional, List, Dict
 from app.config import get_settings
 from github_client import get_file_content as _gh_get_file
 
@@ -58,7 +59,7 @@ class CodeAnalyzer:
                         "severity": "low" if category in AUTO_FIXABLE_CATEGORIES else "high"}
         return {"category": BugCategory.UNKNOWN.value, "auto_fixable": False, "severity": "medium"}
 
-    def parse_stack_trace(self, stack_trace: str) -> list[dict]:
+    def parse_stack_trace(self, stack_trace: str) -> List[Dict]:
         frames = []
         pattern = r"at\s+(?:(.+?)\s+)?\(?((?:/[^:)]+|[A-Za-z]:\\[^:)]+)):(\d+):(\d+)\)?"
         for m in re.finditer(pattern, stack_trace):
@@ -75,7 +76,7 @@ class CodeAnalyzer:
                 return absolute_path[len(prefix):]
         return absolute_path.lstrip("/")
 
-    def fetch_file_from_github(self, file_path: str, branch: str = "main") -> dict | None:
+    def fetch_file_from_github(self, file_path: str, branch: str = "main") -> Optional[Dict]:
         if not self.settings.github_token or not self.settings.github_repo:
             return None
         try:
