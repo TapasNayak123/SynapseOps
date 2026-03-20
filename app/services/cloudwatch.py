@@ -77,7 +77,11 @@ def _parse_event(event: dict) -> dict | None:
 
 
 class CloudWatchService:
-    # ── In-memory cache for stream scan (shared across calls, short TTL) ──
+    # ── In-memory cache for stream scan (shared across ALL instances, short TTL) ──
+    # This is intentionally a class variable so all CloudWatchService instances
+    # share the same cache. This is safe because all instances use the same log group
+    # (configured via settings). If multiple log groups were needed, this would need
+    # to be keyed by log_group.
     _stream_cache: list[dict] = []
     _stream_cache_ts: float = 0
     _STREAM_CACHE_TTL = 60  # seconds

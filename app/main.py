@@ -3,20 +3,24 @@
 Combines the PR analysis dashboard, GitHub webhook receiver, API monitoring,
 chat engine, and auto-fix services into a single server.
 """
-from contextlib import asynccontextmanager
-from pathlib import Path
+from __future__ import annotations
+
 import hashlib
 import hmac
 import logging
 import threading
+from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request, Form, Query, HTTPException
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, HTTPException, Query, Request, Form
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 import structlog
 
-from app.config import get_settings
+from app.config import get_settings, validate_settings_on_startup
 from app.routes import metrics, chat, alerts, websockets
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
@@ -63,6 +67,12 @@ def _seed_monitored_apis():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("starting")
+
+    # Validate configuration and log warnings
+    for warning in validate_settings_on_startup():
+        py_logger.warning("CONFIG: %s", warning)
+        logger.warning("config_warning", msg=warning)
+
     _seed_monitored_apis()
 
     # Start APScheduler (monitoring jobs)
@@ -81,16 +91,14 @@ async def lifespan(app: FastAPI):
 
     try:
         stop_scheduler()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("scheduler_stop_failed", error=str(e))
     logger.info("stopped")
 
 
 app = FastAPI(title="SynapseOps", version="1.0.0", lifespan=lifespan)
 
 # Prevent browser caching of HTML pages (avoids stale chat widget)
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request as StarletteRequest
 
 class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
@@ -288,7 +296,7 @@ def api_pipelines():
                 "run_id": r.run_id,
                 "workflow": r.workflow,
                 "status": r.status,
-                "conclusion": r.conclusion,
+                "conclusion": r.status,
                 "timestamp": r.timestamp,
             }
             for r in records[:20]  # Limit to recent 20

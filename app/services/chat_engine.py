@@ -17,6 +17,26 @@ logger = structlog.get_logger()
 
 
 class ChatEngine:
+    # Keyword pre-classification map — catches obvious intents the LLM might miss
+    _KW_MAP: dict[str, list[str]] = {
+        "pod_status": [
+            "pod", "pods", "cluster", "clusters", "eks", "k8s", "kubernetes",
+            "node", "nodes", "container", "containers", "kubectl", "namespace",
+            "running cluster", "cluster detail", "cluster status", "workload",
+            "cpu usage", "memory usage", "restart",
+        ],
+        "pipeline_status": [
+            "pipeline", "pipelines", "workflow", "github action", "build status",
+            "ci/cd", "cicd", "build fail", "workflow run",
+        ],
+        "deployment_gate_status": [
+            "deployment gate", "deploy gate", "held deploy", "release gate",
+        ],
+        "pr_summary": [
+            "pull request", "pr review", "code review", "recent pr",
+        ],
+    }
+
     def __init__(self):
         self.llm = LLMService()
         self.cw = CloudWatchService()
@@ -155,18 +175,8 @@ class ChatEngine:
             follow_up_hint = f'\nPrevious intent was: "{last_intent}". If the user\'s message is a short follow-up (e.g., "check for X", "what about Y", "now for Z"), reuse the same intent with the new parameters extracted from the message.'
         # ── Keyword pre-classification: catch obvious intents the LLM might miss ──
         msg_lower = message.lower()
-        _KW_MAP = {
-            "pod_status": ["pod", "pods", "cluster", "clusters", "eks", "k8s", "kubernetes",
-                           "node", "nodes", "container", "containers", "kubectl", "namespace",
-                           "running cluster", "cluster detail", "cluster status", "workload",
-                           "cpu usage", "memory usage", "restart"],
-            "pipeline_status": ["pipeline", "pipelines", "workflow", "github action", "build status",
-                                "ci/cd", "cicd", "build fail", "workflow run"],
-            "deployment_gate_status": ["deployment gate", "deploy gate", "held deploy", "release gate"],
-            "pr_summary": ["pull request", "pr review", "code review", "recent pr"],
-        }
         keyword_hint = ""
-        for intent_name, keywords in _KW_MAP.items():
+        for intent_name, keywords in self._KW_MAP.items():
             if any(kw in msg_lower for kw in keywords):
                 keyword_hint = f'\nKeyword hint: the message likely matches "{intent_name}" intent.'
                 break
@@ -196,7 +206,7 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
                 parsed["correlation_id"] = self._extract_correlation_id(message)
             # Hard override: if LLM classified as general/service_info but keywords clearly match another intent
             if parsed.get("intent") in ("general", "service_info") and keyword_hint:
-                for intent_name, keywords in _KW_MAP.items():
+                for intent_name, keywords in self._KW_MAP.items():
                     if any(kw in msg_lower for kw in keywords):
                         parsed["intent"] = intent_name
                         break
@@ -302,9 +312,7 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
             logger.error("fetch_failed", intent=t, error=str(e))
             return {"error": str(e)}
 
-    # ── New data fetchers for expanded intents ────────────────────────────
-
-    # ── New data fetchers for expanded intents ────────────────────────────
+    # ── Data fetchers for expanded intents ───────────────────────────────
 
     def _fetch_pod_status(self) -> dict:
         """Fetch Kubernetes pod status, resource usage, and node info."""
@@ -367,9 +375,9 @@ JSON: {{"intent": "...", "api_path": "...", "correlation_id": "...", "status_cod
                 "recent_prs": prs,
                 "stats": {
                     "total_reviewed": stats.get("total", 0),
-                    "avg_duration_seconds": stats.get("avg_duration", 0),
+                    "avg_duration_ms": stats.get("avg_duration_ms", 0),
                     "risk_distribution": stats.get("risk_counts", {}),
-                    "type_distribution": stats.get("type_counts", {}),
+                    "total_files": stats.get("total_files", 0),
                 },
             }
         except Exception as e:

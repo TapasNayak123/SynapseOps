@@ -19,3 +19,4 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     data: Optional[dict] = None
+    intent: Optional[dict] = None

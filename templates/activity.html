@@ -170,20 +170,26 @@ function formatTime(ts) {
     return d.toLocaleTimeString('en-US', {hour12:false}) + '.' + String(d.getMilliseconds()).padStart(3,'0');
 }
 
+function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
 function createRow(e) {
     const tr = document.createElement('tr');
-    tr.className = `log-row log-${e.event} new-entry`;
+    tr.className = `log-row log-${escapeHtml(e.event)} new-entry`;
     tr.setAttribute('data-agent', e.agent);
     tr.setAttribute('data-event', e.event);
     const ctx = e.repo ? (e.repo + (e.pr_number ? ` #${e.pr_number}` : '')) : '—';
     const dur = e.duration_ms ? (e.duration_ms / 1000).toFixed(1) + 's' : '—';
     tr.innerHTML = `
         <td class="log-time">${formatTime(e.timestamp)}</td>
-        <td><span class="agent-tag">${e.agent}</span></td>
-        <td><span class="event-badge event-${e.event}">${e.event}</span></td>
-        <td>${e.message}</td>
-        <td style="color:#6e7681;font-size:12px;">${ctx}</td>
-        <td style="color:#6e7681;">${dur}</td>`;
+        <td><span class="agent-tag">${escapeHtml(e.agent)}</span></td>
+        <td><span class="event-badge event-${escapeHtml(e.event)}">${escapeHtml(e.event)}</span></td>
+        <td>${escapeHtml(e.message)}</td>
+        <td style="color:#6e7681;font-size:12px;">${escapeHtml(ctx)}</td>
+        <td style="color:#6e7681;">${escapeHtml(dur)}</td>`;
     return tr;
 }
 

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -56,7 +59,8 @@ class ActivityLog:
             self._db_ready = True
             # Load recent entries from DynamoDB into memory
             self._load_recent()
-        except Exception:
+        except Exception as e:
+            _logger.warning("DynamoDB audit table init failed (activity log will be in-memory only): %s", e)
             self._db_ready = False
 
     def _load_recent(self):
@@ -64,8 +68,9 @@ class ActivityLog:
         if self._loaded or not self._db_ready:
             return
         try:
-            today = datetime.utcnow().strftime("%Y-%m-%d")
-            yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+            now = datetime.now(timezone.utc)
+            today = now.strftime("%Y-%m-%d")
+            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
             entries = []
             for day in [yesterday, today]:
                 resp = self._db_table.query(
@@ -88,8 +93,9 @@ class ActivityLog:
                     self._entries = entries[-self.MAX_MEMORY:]
                     self._counter = len(self._entries)
             self._loaded = True
-        except Exception:
-            pass  # Degrade gracefully
+            _logger.info("Loaded %d activity entries from DynamoDB", len(entries))
+        except Exception as e:
+            _logger.warning("Failed to load recent activity from DynamoDB: %s", e)
 
     def emit(self, agent: str, event: str, message: str, *,
              repo: str = "", pr_number: int = 0, duration_ms: int = 0):
@@ -113,8 +119,8 @@ class ActivityLog:
         if not self._db_ready or not self._db_table:
             return
         try:
-            day = datetime.utcfromtimestamp(entry.timestamp).strftime("%Y-%m-%d")
-            ts_iso = datetime.utcfromtimestamp(entry.timestamp).isoformat()
+            day = datetime.fromtimestamp(entry.timestamp, tz=timezone.utc).strftime("%Y-%m-%d")
+            ts_iso = datetime.fromtimestamp(entry.timestamp, tz=timezone.utc).isoformat()
             self._db_table.put_item(Item={
                 "pk": f"ACTIVITY#{day}",
                 "sk": ts_iso,
@@ -126,8 +132,8 @@ class ActivityLog:
                 "duration_ms": entry.duration_ms,
                 "timestamp": Decimal(str(round(entry.timestamp, 3))),
             })
-        except Exception:
-            pass  # Never break the caller
+        except Exception as e:
+            _logger.debug("Activity DynamoDB persist failed: %s", e)
 
     def _broadcast_to_websocket(self, entry: LogEntry):
         """Push to WebSocket clients (non-blocking, thread-safe)."""
@@ -145,8 +151,8 @@ class ActivityLog:
                     asyncio.run_coroutine_threadsafe(
                         manager.broadcast_activity(event_dict), self._loop
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.debug("WebSocket broadcast failed: %s", e)
 
     def set_event_loop(self, loop):
         """Store main event loop reference for cross-thread WS broadcasting."""

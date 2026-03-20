@@ -62,8 +62,8 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
             if content:
                 decoded = base64.b64decode(content['content']).decode('utf-8')
                 file_contents[file_path] = decoded[:3000]  # Limit size
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not fetch file %s: %s", file_path, e)
     
     files_context = ""
     if file_contents:

@@ -26,7 +26,11 @@ def chat(request: ChatRequest):
 
     try:
         result = ChatEngine().process_message(msg, request.context)
-        return ChatResponse(response=result["response"], data=result.get("data"))
+        return ChatResponse(
+            response=result["response"],
+            data=result.get("data"),
+            intent=result.get("intent"),
+        )
     except Exception as e:
         logger.error("chat_error", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to process message")

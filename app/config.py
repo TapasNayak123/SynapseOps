@@ -70,3 +70,22 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def validate_settings_on_startup() -> list[str]:
+    """Validate critical settings at startup. Returns list of warnings."""
+    import os
+    warnings: list[str] = []
+    s = get_settings()
+
+    if s.cloudwatch_log_group == "/your/service/log-group":
+        warnings.append("CLOUDWATCH_LOG_GROUP is still the default placeholder — monitoring will not work.")
+    if not s.github_token:
+        warnings.append("GITHUB_TOKEN is not set — PR analysis and webhook features will fail.")
+    if not s.github_webhook_secret:
+        warnings.append("GITHUB_WEBHOOK_SECRET is empty — webhook signature verification is DISABLED (insecure).")
+    if not s.github_repo:
+        warnings.append("GITHUB_REPO is not set — pipeline monitoring will not know which repos to watch.")
+    if s.redis_url == "redis://localhost:6379/0" and os.environ.get("REDIS_URL") is None:
+        warnings.append("REDIS_URL is default localhost — Redis caching will be unavailable in production.")
+    return warnings

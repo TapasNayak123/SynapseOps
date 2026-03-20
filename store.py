@@ -76,8 +76,12 @@ def _ensure_table(table_name: str, pk_type: str = "S", sk_type: str = "S"):
 
 
 def _float_to_decimal(obj):
-    """Recursively convert floats to Decimal for DynamoDB."""
+    """Recursively convert floats to Decimal for DynamoDB.
+    Handles NaN and Infinity which DynamoDB does not support."""
     if isinstance(obj, float):
+        import math
+        if math.isnan(obj) or math.isinf(obj):
+            return Decimal("0")
         return Decimal(str(obj))
     if isinstance(obj, dict):
         return {k: _float_to_decimal(v) for k, v in obj.items()}
@@ -97,6 +101,23 @@ def _decimal_to_float(obj):
     if isinstance(obj, list):
         return [_decimal_to_float(i) for i in obj]
     return obj
+
+
+def _paginated_scan(table, max_items: int = 1000) -> list[dict]:
+    """Scan a DynamoDB table with pagination to handle large datasets."""
+    items: list[dict] = []
+    kwargs: dict = {}
+    while True:
+        resp = table.scan(**kwargs)
+        items.extend(resp.get("Items", []))
+        if len(items) >= max_items:
+            items = items[:max_items]
+            break
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    return items
 
 
 # ── Dataclasses (unchanged interface) ─────────────────────────────────────
@@ -223,7 +244,7 @@ class PRStore:
 
     def all(self) -> list[PRRecord]:
         try:
-            items = self._get_table().scan().get("Items", [])
+            items = _paginated_scan(self._get_table(), max_items=500)
             records = [self._from_item(i) for i in items]
             records.sort(key=lambda r: r.timestamp, reverse=True)
             return records
@@ -400,7 +421,7 @@ class PipelineStore:
 
     def all(self) -> list[PipelineRecord]:
         try:
-            items = self._get_table().scan().get("Items", [])
+            items = _paginated_scan(self._get_table(), max_items=500)
             records = [self._from_item(i) for i in items]
             records.sort(key=lambda r: r.timestamp, reverse=True)
             return records
