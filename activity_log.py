@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+import asyncio
 from dataclasses import dataclass, field
 
 
@@ -40,6 +41,31 @@ class ActivityLog:
             # Trim oldest when over cap
             if len(self._entries) > self.MAX_ENTRIES:
                 self._entries = self._entries[-self.MAX_ENTRIES:]
+        
+        # Broadcast to WebSocket clients (non-blocking)
+        self._broadcast_to_websocket(entry)
+
+    def _broadcast_to_websocket(self, entry: LogEntry):
+        """Broadcast activity to WebSocket clients (non-blocking)."""
+        try:
+            from app.services.websocket_manager import get_websocket_manager
+            manager = get_websocket_manager()
+            
+            # Create a task to broadcast without blocking
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(manager.broadcast_activity({
+                    "agent": entry.agent,
+                    "event": entry.event,
+                    "message": entry.message,
+                    "repo": entry.repo,
+                    "pr_number": entry.pr_number,
+                    "duration_ms": entry.duration_ms,
+                    "timestamp": entry.timestamp,
+                }))
+        except Exception:
+            # Silently fail if WebSocket not available (e.g., during startup)
+            pass
 
     def all(self) -> list[LogEntry]:
         with self._lock:

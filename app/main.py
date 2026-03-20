@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 import structlog
 
 from app.config import get_settings
-from app.routes import metrics, chat, alerts
+from app.routes import metrics, chat, alerts, websockets
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 # Root-level imports (PR analysis pipeline)
@@ -98,10 +98,11 @@ class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(NoCacheHTMLMiddleware)
 
-# Include FastAPI routers (monitoring, chat, alerts)
+# Include FastAPI routers (monitoring, chat, alerts, websockets)
 app.include_router(metrics.router)
 app.include_router(chat.router)
 app.include_router(alerts.router)
+app.include_router(websockets.router)
 
 # Static files
 if STATIC_DIR.is_dir():
@@ -269,6 +270,27 @@ def api_prs():
 def api_activity(since: int = Query(0)):
     entries, cursor = activity_log.since(since)
     return {"entries": activity_log.to_dicts(entries), "cursor": cursor}
+
+
+@app.get("/api/pipelines")
+def api_pipelines():
+    """Get pipeline data for AJAX updates."""
+    records = pipeline_store.all()
+    stats = pipeline_store.stats()
+    return {
+        "pipelines": [
+            {
+                "repo": r.repo,
+                "run_id": r.run_id,
+                "workflow": r.workflow,
+                "status": r.status,
+                "conclusion": r.conclusion,
+                "timestamp": r.timestamp,
+            }
+            for r in records[:20]  # Limit to recent 20
+        ],
+        "stats": stats
+    }
 
 
 # ── Deployment Gate API ──────────────────────────────────────────────────
