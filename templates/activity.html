@@ -38,7 +38,20 @@
 <div class="table-wrap">
     <div class="table-header" style="display:flex; justify-content:space-between; align-items:center;">
         <span>Real-Time Agent Events</span>
-        <span style="font-size:12px; color:#6e7681; font-weight:400;" id="lastUpdate">—</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <select id="filterAgent" class="filter-select" onchange="applyFilters()">
+                <option value="">All Agents</option>
+            </select>
+            <select id="filterEvent" class="filter-select" onchange="applyFilters()">
+                <option value="">All Events</option>
+                <option value="started">started</option>
+                <option value="processing">processing</option>
+                <option value="completed">completed</option>
+                <option value="error">error</option>
+            </select>
+            <button onclick="resetFilters()" class="btn" style="padding:4px 10px; font-size:11px; background:rgba(255,255,255,0.04); color:#6e7681;">Reset</button>
+            <span style="font-size:12px; color:#6e7681; font-weight:400;" id="lastUpdate">—</span>
+        </div>
     </div>
     <div id="logBody" style="max-height:600px; overflow-y:auto;">
         <table>
@@ -54,7 +67,7 @@
             </thead>
             <tbody id="logEntries">
             {% for e in entries|reverse %}
-                <tr class="log-row log-{{ e.event }}">
+                <tr class="log-row log-{{ e.event }}" data-agent="{{ e.agent }}" data-event="{{ e.event }}">
                     <td class="log-time">{{ "%.3f"|format(e.timestamp) }}</td>
                     <td><span class="agent-tag">{{ e.agent }}</span></td>
                     <td><span class="event-badge event-{{ e.event }}">{{ e.event }}</span></td>
@@ -112,6 +125,28 @@
     .event-processing { background: rgba(227,179,65,0.12); color: #e3b341; border: 1px solid rgba(227,179,65,0.2); }
     .event-completed { background: rgba(63,185,80,0.12); color: #3fb950; border: 1px solid rgba(63,185,80,0.2); }
     .event-error { background: rgba(248,81,73,0.12); color: #f85149; border: 1px solid rgba(248,81,73,0.2); }
+
+    .filter-select {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(88,166,255,0.12);
+        border-radius: 8px;
+        padding: 5px 28px 5px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #c9d1d9;
+        font-family: 'Inter', sans-serif;
+        cursor: pointer;
+        outline: none;
+        appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236e7681'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        transition: all 0.2s;
+    }
+    .filter-select:hover { border-color: rgba(88,166,255,0.3); }
+    .filter-select:focus { border-color: rgba(88,166,255,0.4); box-shadow: 0 0 0 2px rgba(88,166,255,0.08); }
+    .filter-select option { background: #0d1321; color: #c9d1d9; }
+    .filter-select.active-filter { border-color: rgba(88,166,255,0.4); color: #58a6ff; }
 </style>
 
 <script>
@@ -127,6 +162,8 @@ function formatTime(ts) {
 function createRow(e) {
     const tr = document.createElement('tr');
     tr.className = `log-row log-${e.event} new-entry`;
+    tr.setAttribute('data-agent', e.agent);
+    tr.setAttribute('data-event', e.event);
     const ctx = e.repo ? (e.repo + (e.pr_number ? ` #${e.pr_number}` : '')) : '—';
     const dur = e.duration_ms ? (e.duration_ms / 1000).toFixed(1) + 's' : '—';
     tr.innerHTML = `
@@ -140,17 +177,8 @@ function createRow(e) {
 }
 
 function updateStats(entries) {
-    const all = document.querySelectorAll('.log-row');
-    let active = 0, completed = 0, errors = 0;
-    all.forEach(r => {
-        if (r.classList.contains('log-started') || r.classList.contains('log-processing')) active++;
-        if (r.classList.contains('log-completed')) completed++;
-        if (r.classList.contains('log-error')) errors++;
-    });
-    document.getElementById('statTotal').textContent = all.length;
-    document.getElementById('statActive').textContent = active;
-    document.getElementById('statCompleted').textContent = completed;
-    document.getElementById('statErrors').textContent = errors;
+    rebuildAgentDropdown();
+    applyFilters();
 }
 
 async function poll() {
@@ -182,5 +210,68 @@ document.querySelectorAll('.log-time').forEach(td => {
 
 updateStats();
 setInterval(poll, 3000);
+
+// ── Filters ──
+const knownAgents = new Set();
+
+function rebuildAgentDropdown() {
+    document.querySelectorAll('.log-row').forEach(r => {
+        const a = r.getAttribute('data-agent');
+        if (a) knownAgents.add(a);
+    });
+    const sel = document.getElementById('filterAgent');
+    const current = sel.value;
+    const opts = ['<option value="">All Agents</option>'];
+    [...knownAgents].sort().forEach(a => {
+        opts.push(`<option value="${a}"${a === current ? ' selected' : ''}>${a}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+}
+
+function applyFilters() {
+    const agentVal = document.getElementById('filterAgent').value;
+    const eventVal = document.getElementById('filterEvent').value;
+    document.getElementById('filterAgent').classList.toggle('active-filter', !!agentVal);
+    document.getElementById('filterEvent').classList.toggle('active-filter', !!eventVal);
+    let visible = 0, hidden = 0;
+    document.querySelectorAll('.log-row').forEach(r => {
+        const matchAgent = !agentVal || r.getAttribute('data-agent') === agentVal;
+        const matchEvent = !eventVal || r.getAttribute('data-event') === eventVal;
+        if (matchAgent && matchEvent) {
+            r.style.display = '';
+            visible++;
+        } else {
+            r.style.display = 'none';
+            hidden++;
+        }
+    });
+    // Update stats to reflect filtered view
+    updateFilteredStats();
+}
+
+function updateFilteredStats() {
+    let total = 0, active = 0, completed = 0, errors = 0;
+    document.querySelectorAll('.log-row').forEach(r => {
+        if (r.style.display === 'none') return;
+        total++;
+        if (r.classList.contains('log-started') || r.classList.contains('log-processing')) active++;
+        if (r.classList.contains('log-completed')) completed++;
+        if (r.classList.contains('log-error')) errors++;
+    });
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statActive').textContent = active;
+    document.getElementById('statCompleted').textContent = completed;
+    document.getElementById('statErrors').textContent = errors;
+}
+
+function resetFilters() {
+    document.getElementById('filterAgent').value = '';
+    document.getElementById('filterEvent').value = '';
+    document.getElementById('filterAgent').classList.remove('active-filter');
+    document.getElementById('filterEvent').classList.remove('active-filter');
+    applyFilters();
+}
+
+rebuildAgentDropdown();
 </script>
 {% endblock %}
