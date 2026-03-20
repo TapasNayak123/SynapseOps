@@ -37,9 +37,9 @@ class PerformanceAnalyzer:
         self.cache.set(cache_key, apis, ttl_seconds=300)
         return apis
 
-    def compute_health_score(self, api_path: str) -> dict:
-        metrics = self.cw.get_api_metrics(api_path, period_minutes=5)
-        latency = self.cw.get_latency_metrics(api_path, period_minutes=5)
+    def compute_health_score(self, api_path: str, period_minutes: int = 5) -> dict:
+        metrics = self.cw.get_api_metrics(api_path, period_minutes=period_minutes)
+        latency = self.cw.get_latency_metrics(api_path, period_minutes=period_minutes)
 
         error_rate = metrics.get("error_rate", 0)
         avg_latency = latency.get("avg_latency_ms", 0)

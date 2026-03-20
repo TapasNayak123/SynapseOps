@@ -23,14 +23,15 @@ class IncidentAnalyzer:
         start_time = base.replace(hour=start_hour, minute=0, second=0, microsecond=0)
         end_time = base.replace(hour=end_hour, minute=0, second=0, microsecond=0)
         hours_back = max(1, int((datetime.utcnow() - start_time).total_seconds() / 3600))
+        api_filter = self.cw._api_filter
 
         errors = self.cw.query_logs(f"""fields @timestamp, {F_PATH}, {F_METHOD}, {F_STATUS}, {F_MESSAGE}, {F_ERROR_CODE}
-| filter ({F_LEVEL} = "error" or {F_STATUS} >= 400)
+| filter ({F_LEVEL} = "error" or {F_STATUS} >= 400) and {api_filter}
 | filter @timestamp >= "{start_time.isoformat()}" and @timestamp <= "{end_time.isoformat()}"
 | sort @timestamp asc | limit 200""", hours_back)
 
         slow = self.cw.query_logs(f"""fields @timestamp, {F_PATH}, {F_METHOD}, {F_DURATION}
-| filter {F_MESSAGE} = "Request completed" and ispresent({F_DURATION})
+| filter {F_MESSAGE} = "Request completed" and ispresent({F_DURATION}) and {api_filter}
 | parse {F_DURATION} /(?<d>\\d+)/ | filter d > {self.settings.slow_api_threshold_ms}
 | filter @timestamp >= "{start_time.isoformat()}" and @timestamp <= "{end_time.isoformat()}"
 | sort @timestamp asc | limit 100""", hours_back)
@@ -74,8 +75,9 @@ class IncidentAnalyzer:
                 }}
 
     def detect_recurring_errors(self, hours_back: int = 168) -> list[dict]:
+        api_filter = self.cw._api_filter
         logs = self.cw.query_logs(f"""fields @timestamp, {F_PATH}, {F_STATUS}, {F_MESSAGE}, {F_ERROR_CODE}
-| filter {F_STATUS} >= 500 or {F_LEVEL} = "error" | sort @timestamp desc | limit 500""", hours_back)
+| filter ({F_STATUS} >= 500 or {F_LEVEL} = "error") and {api_filter} | sort @timestamp desc | limit 500""", hours_back)
 
         groups: dict[str, dict] = {}
         for entry in logs:

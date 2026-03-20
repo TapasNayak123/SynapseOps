@@ -12,7 +12,7 @@ import threading
 
 from fastapi import FastAPI, Request, Form, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import structlog
 
@@ -84,13 +84,28 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SynapseOps", version="1.0.0", lifespan=lifespan)
 
+# Prevent browser caching of HTML pages (avoids stale chat widget)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        ct = response.headers.get("content-type", "")
+        if "text/html" in ct:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+app.add_middleware(NoCacheHTMLMiddleware)
+
 # Include FastAPI routers (monitoring, chat, alerts)
 app.include_router(metrics.router)
 app.include_router(chat.router)
 app.include_router(alerts.router)
 
 # Static files
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 # ── Health endpoints ──────────────────────────────────────────────────────
@@ -114,13 +129,6 @@ def readiness():
         d = False
     return {"status": "ready" if r and d else "degraded",
             "redis": "ok" if r else "error", "dynamodb": "ok" if d else "error"}
-
-
-# ── Chat UI ───────────────────────────────────────────────────────────────
-
-@app.get("/chat")
-def chat_ui():
-    return FileResponse(str(STATIC_DIR / "chat.html"))
 
 
 # ── Dashboard routes ───────────────────────────────────────────────────────

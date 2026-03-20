@@ -31,12 +31,14 @@ class ErrorAnalyzer:
 
     def analyze_api_errors(self, api_path: str) -> dict:
         metrics = self.cw.get_api_metrics(api_path, period_minutes=1)
-        error_rate = metrics["error_rate"]
+        # Use server_error_rate (5xx only) for threshold alerting
+        error_rate = metrics["server_error_rate"]
         self.db.store_metric_snapshot(metrics)
         self.cache.set(f"metrics:latest:{api_path}", metrics, ttl_seconds=120)
 
         exceeded = error_rate >= self.settings.error_rate_threshold
-        result = {"api_path": api_path, "error_rate": error_rate,
+        result = {"api_path": api_path, "error_rate": metrics["error_rate"],
+                  "server_error_rate": error_rate,
                   "threshold": self.settings.error_rate_threshold, "exceeded": exceeded, "alerted": False}
         if exceeded:
             result["alerted"] = self._maybe_alert(api_path, metrics)
@@ -60,17 +62,31 @@ class ErrorAnalyzer:
 
     def get_errors_by_status(self, hours_back: int = 1) -> dict:
         """Single aggregated query for error breakdown by status code."""
-        query = """fields @timestamp, statusCode, path, errorCode, message
-            | filter statusCode >= 400
+        api_filter = self.cw._api_filter
+        query = f"""fields @timestamp, statusCode, path, errorCode, message
+            | filter statusCode >= 400 and {api_filter}
             | stats count(*) as cnt by statusCode
             | sort cnt desc"""
         results = self.cw.query_logs(query, hours_back, limit=50)
 
         categories = {}
-        for row in results:
-            sc = int(row.get("statusCode", 500))
-            cat = self.categorize_status(sc).value
-            categories.setdefault(cat, []).append({
-                "status_code": sc, "count": int(row.get("cnt", 0)), "samples": []
-            })
+        if results:
+            for row in results:
+                sc = int(row.get("statusCode", 500))
+                cat = self.categorize_status(sc).value
+                categories.setdefault(cat, []).append({
+                    "status_code": sc, "count": int(row.get("cnt", 0)), "samples": []
+                })
+        else:
+            # Fallback: aggregate from stream scan
+            from collections import Counter
+            events = [e for e in self.cw._get_recent_events(hours_back)
+                      if self.cw._matches_api_filter(e) and int(e.get("statusCode", 0) or 0) >= 400]
+            counts = Counter(int(e.get("statusCode", 500) or 500) for e in events)
+            for sc, cnt in counts.most_common():
+                cat = self.categorize_status(sc).value
+                categories.setdefault(cat, []).append({
+                    "status_code": sc, "count": cnt, "samples": []
+                })
         return categories
+

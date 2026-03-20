@@ -82,6 +82,6 @@
 </div>
 
 <script>
-setTimeout(() => location.reload(), 30000);
+setTimeout(() => { if (!window.chatOpen) location.reload(); }, 30000);
 </script>
 {% endblock %}

@@ -252,5 +252,5 @@ new Chart(document.getElementById('authorChart'), {
 });
 </script>
 
-<script>setTimeout(() => location.reload(), 60000);</script>
+<script>setTimeout(() => { if (!window.chatOpen) location.reload(); }, 60000);</script>
 {% endblock %}
