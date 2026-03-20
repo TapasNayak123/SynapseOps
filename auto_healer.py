@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from typing import Optional
 
 from bedrock_client import invoke_model
 from github_client import (
@@ -19,7 +20,7 @@ from app.services.retry import retry_with_backoff
 logger = logging.getLogger(__name__)
 
 
-def find_pr_for_branch(repo: str, branch: str) -> dict | None:
+def find_pr_for_branch(repo: str, branch: str) -> Optional[dict]:
     """Find an open PR associated with a branch."""
     url = f"{GITHUB_API}/repos/{repo}/pulls?state=open&head={repo.split('/')[0]}:{branch}"
     resp = _get_session().get(url, headers=gh_headers(), timeout=30)
@@ -51,18 +52,35 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
 
     # Try to extract file paths from error logs
     import re
-    file_pattern = r'(?:at|in|from|File)\s+"?([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go|json))"?'
-    potential_files = re.findall(file_pattern, logs[:5000])
     
-    # Also look for common patterns like "src/app.js:10:5"
+    # Pattern 1: TypeScript/ESLint errors: "src/file.ts(10,5): error"
+    ts_pattern = r'([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go|json))\(\d+,\d+\)'
+    potential_files = re.findall(ts_pattern, logs)
+    
+    # Pattern 2: Standard stack traces: "at file.js:10:5" or "in file.js"
+    file_pattern = r'(?:at|in|from|File)\s+"?([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go|json))"?'
+    potential_files.extend(re.findall(file_pattern, logs))
+    
+    # Pattern 3: Common patterns like "src/app.js:10:5"
     path_pattern = r'([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go|json)):\d+'
-    potential_files.extend(re.findall(path_pattern, logs[:5000]))
+    potential_files.extend(re.findall(path_pattern, logs))
+    
+    # Pattern 4: FAIL messages: "FAIL src/test.js"
+    fail_pattern = r'FAIL\s+([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go|json))'
+    potential_files.extend(re.findall(fail_pattern, logs))
+    
+    # Pattern 5: For Docker/workflow errors, look for workflow files
+    if 'docker' in logs.lower() or 'buildx' in logs.lower() or 'invalid tag' in logs.lower():
+        # This might be a workflow configuration issue
+        potential_files.extend(['.github/workflows/deploy.yml', '.github/workflows/ci.yml', '.github/workflows/main.yml'])
+    
+    logger.info("Extracted potential files from logs: %s", set(potential_files[:10]))
     
     # Fetch content of potential problem files
     file_contents = {}
     branch = run.get('head_branch', 'main')
     
-    for file_path in set(potential_files[:5]):  # Limit to 5 files
+    for file_path in set(potential_files[:10]):  # Limit to 10 files
         # Clean up the path
         file_path = file_path.strip().strip('"').strip("'")
         if not file_path or file_path.startswith('node_modules'):
@@ -80,6 +98,30 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
                 logger.info("Successfully fetched %s (%d bytes)", file_path, len(decoded))
         except Exception as e:
             logger.warning("Could not fetch %s: %s", file_path, str(e))
+            # For workflow files that might not exist, try common alternatives
+            if '.github/workflows/' in file_path:
+                # Try to list all workflow files
+                try:
+                    from github_client import _get_session
+                    url = f"{GITHUB_API}/repos/{repo}/contents/.github/workflows"
+                    resp = _get_session().get(url, headers=gh_headers(), params={'ref': branch}, timeout=30)
+                    if resp.status_code == 200:
+                        workflow_files = resp.json()
+                        if workflow_files and isinstance(workflow_files, list):
+                            # Try the first workflow file
+                            first_workflow = workflow_files[0]['path']
+                            logger.info("Trying alternative workflow file: %s", first_workflow)
+                            content = get_file_content(repo, first_workflow, branch)
+                            if content:
+                                decoded = base64.b64decode(content['content']).decode('utf-8')
+                                file_contents[first_workflow] = {
+                                    'content': decoded,
+                                    'sha': content['sha']
+                                }
+                                logger.info("Successfully fetched %s (%d bytes)", first_workflow, len(decoded))
+                                break
+                except Exception as e2:
+                    logger.warning("Could not list workflow files: %s", str(e2))
     
     if not file_contents:
         logger.warning("No file contents could be fetched from error logs")
@@ -95,7 +137,7 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
         content_preview = info['content'][:2000]  # Limit for prompt
         files_context += f"\n### File: {path}\n```\n{content_preview}\n```\n"
 
-    prompt = f"""You are an Auto-Healing Agent. A CI/CD pipeline failed. Your job is to fix the code.
+    prompt = f"""You are an Auto-Healing Agent. A CI/CD pipeline failed. Analyze the error and provide a fix.
 
 ## Pipeline Info
 - Repository: {repo}
@@ -113,58 +155,108 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
 {files_context}
 
 ## Your Task
-1. Identify the root cause from the logs
-2. If it's a code issue (syntax error, missing import, wrong logic), set fixable=true
-3. If it's infrastructure (network, permissions, external service), set fixable=false
-4. If fixable=true, provide the COMPLETE fixed file content
+Analyze the error and determine if it's fixable by code changes.
 
-## Response Format (JSON only, no markdown)
+Common fixable issues:
+- TypeScript type errors (missing types, implicit any)
+- Missing imports
+- Syntax errors
+- Logic errors in code
+- Test failures due to code bugs
+
+NOT fixable (infrastructure/external):
+- Network errors, timeouts
+- Permission/authentication failures
+- Missing environment variables
+- External service failures
+
+## Response Format
+Respond with ONLY a JSON object (no markdown, no code fences):
+
 {{
-    "fixable": true,
-    "explanation": "Brief explanation of the issue and fix",
+    "fixable": true or false,
+    "explanation": "Brief explanation of the issue",
     "commit_message": "fix: description",
     "files": [
         {{
-            "path": "exact/path/from/above.js",
+            "path": "src/utils/object-helper.ts",
             "action": "update",
-            "content": "COMPLETE file content with fix applied - must be valid code",
-            "explanation": "What was changed"
+            "changes": "Describe the specific changes needed, line by line",
+            "fixed_content": "COMPLETE fixed file content here - the entire file with fixes applied"
         }}
     ]
 }}
 
-CRITICAL:
-- If fixable=true, you MUST include at least one file with complete content
-- Use exact file paths from the "Current File Contents" section above
-- Provide the ENTIRE file, not just the changed lines
-- Respond with ONLY the JSON object, nothing else"""
+CRITICAL RULES:
+1. Respond with ONLY the JSON - no markdown fences, no extra text
+2. If fixable=true, include at least one file in the files array
+3. The "fixed_content" must be the COMPLETE file with all fixes applied
+4. Use exact paths from the "Current File Contents" section
+5. Make sure the fixed_content is valid, runnable code"""
 
     try:
-        result = invoke_model(prompt, max_tokens=10000)
+        result = invoke_model(prompt, max_tokens=12000)
+        logger.info("Raw AI response length: %d chars", len(result))
         
         # Aggressive cleaning
         text = result.strip()
         
-        # Remove markdown code fences
+        # Remove markdown code fences if present
         if text.startswith("```"):
             lines = text.split("\n")
+            # Skip first line
             lines = lines[1:]
-            if lines and lines[-1].strip().startswith("```"):
+            # Remove last line if it's a closing fence
+            while lines and lines[-1].strip().startswith("```"):
                 lines = lines[:-1]
             text = "\n".join(lines).strip()
         
-        # Find JSON object
+        # Find JSON object boundaries
         start = text.find("{")
         end = text.rfind("}") + 1
         
-        if start != -1 and end > start:
-            text = text[start:end]
+        if start == -1 or end <= start:
+            raise ValueError("No JSON object found in response")
         
-        parsed = json.loads(text)
+        text = text[start:end]
         
-        # Validate
+        # Try to parse JSON
+        try:
+            parsed = json.loads(text)
+            logger.info("Successfully parsed JSON response")
+        except json.JSONDecodeError as e:
+            logger.error("JSON parse error at position %d: %s", e.pos if hasattr(e, 'pos') else -1, str(e))
+            logger.error("Problematic section: %s", text[max(0, (e.pos if hasattr(e, 'pos') else 100) - 50):(e.pos if hasattr(e, 'pos') else 100) + 50] if hasattr(e, 'pos') else text[:200])
+            
+            # Fallback: try to extract key fields
+            fixable_match = re.search(r'"fixable"\s*:\s*(true|false)', text, re.IGNORECASE)
+            if not fixable_match:
+                raise ValueError("Could not find 'fixable' field")
+            
+            fixable = fixable_match.group(1).lower() == "true"
+            
+            if not fixable:
+                # If not fixable, we don't need the file content
+                explanation_match = re.search(r'"explanation"\s*:\s*"([^"]+)"', text)
+                return {
+                    "fixable": False,
+                    "explanation": explanation_match.group(1) if explanation_match else "JSON parse error",
+                    "files": [],
+                    "commit_message": ""
+                }
+            else:
+                # If fixable but JSON is broken, we can't safely extract the fix
+                logger.error("Fixable=true but JSON is malformed, cannot extract fix")
+                return {
+                    "fixable": False,
+                    "explanation": "AI indicated fixable but response was malformed JSON",
+                    "files": [],
+                    "commit_message": ""
+                }
+        
+        # Validate structure
         if not isinstance(parsed, dict):
-            raise ValueError("Not a JSON object")
+            raise ValueError("Response is not a JSON object")
         
         # Add defaults
         parsed.setdefault("fixable", False)
@@ -178,6 +270,11 @@ CRITICAL:
                 path = file_info.get("path")
                 if path in file_contents:
                     file_info["_sha"] = file_contents[path]["sha"]
+                    # If fixed_content is missing but we have the original, use it
+                    if not file_info.get("fixed_content") or not file_info["fixed_content"].strip():
+                        logger.warning("File %s has no fixed_content, using original", path)
+                        file_info["fixed_content"] = file_contents[path]["content"]
+                        file_info["_no_changes"] = True
         
         logger.info("AI response: fixable=%s, files=%d", 
                    parsed.get("fixable"), len(parsed.get("files", [])))
@@ -220,8 +317,19 @@ def apply_fix(repo: str, branch: str, fix: dict, run_id: int = None) -> dict:
     files_changed = []
 
     for file_info in fix.get("files", []):
+        # Skip files marked as having no changes
+        if file_info.get("_no_changes"):
+            logger.warning("Skipping file %s - no changes detected", file_info["path"])
+            continue
+            
         path = file_info["path"]
-        content = file_info["content"]
+        # Support both "content" and "fixed_content" field names
+        content = file_info.get("fixed_content") or file_info.get("content")
+        
+        if not content:
+            logger.warning("Skipping file %s - no content provided", path)
+            continue
+            
         action = file_info.get("action", "update")
         content_b64 = base64.b64encode(content.encode()).decode()
 

@@ -8,6 +8,7 @@ import json
 import threading
 import boto3
 import structlog
+from typing import Optional
 from botocore.config import Config as BotoConfig
 from app.config import get_settings
 
@@ -40,7 +41,7 @@ def _strip_code_fences(text: str) -> str:
 
 
 class LLMService:
-    def __init__(self, model_id: str | None = None):
+    def __init__(self, model_id: Optional[str] = None):
         self.client = _get_client()
         self.model_id = model_id or get_settings().bedrock_model_id
 

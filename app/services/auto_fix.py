@@ -5,6 +5,7 @@ import json
 import base64
 import structlog
 from datetime import datetime
+from typing import Optional, List, Dict
 from app.config import get_settings
 from app.services.llm import LLMService, _strip_code_fences
 from app.services.dynamodb import DynamoDBService
@@ -87,7 +88,7 @@ Respond in JSON: {{"root_cause": "...", "explanation": "...", "confidence": 0.0,
         except Exception as e:
             return {"root_cause": str(e), "confidence": 0.0, "fixed_code": None}
 
-    def _create_pr(self, path: str, source: dict, llm: dict, error: str, cat: dict) -> dict | None:
+    def _create_pr(self, path: str, source: Dict, llm: Dict, error: str, cat: Dict) -> Optional[Dict]:
         if not self.settings.github_token or not self.settings.github_repo:
             return None
         repo = self.settings.github_repo
@@ -139,5 +140,5 @@ Respond in JSON: {{"root_cause": "...", "explanation": "...", "confidence": 0.0,
         except Exception as e:
             logger.error("audit_log_failed", error=str(e))
 
-    def get_fix_history(self, limit: int = 20) -> list[dict]:
+    def get_fix_history(self, limit: int = 20) -> List[Dict]:
         return self.db.get_audit_logs(action="auto_fix_analysis", limit=limit)
