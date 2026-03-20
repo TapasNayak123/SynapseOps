@@ -51,146 +51,162 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
 
     # Try to extract file paths from error logs
     import re
-    file_pattern = r'(?:at|in|from)\s+([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go))'
+    file_pattern = r'(?:at|in|from|File)\s+"?([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go|json))"?'
     potential_files = re.findall(file_pattern, logs[:5000])
+    
+    # Also look for common patterns like "src/app.js:10:5"
+    path_pattern = r'([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go|json)):\d+'
+    potential_files.extend(re.findall(path_pattern, logs[:5000]))
     
     # Fetch content of potential problem files
     file_contents = {}
-    for file_path in set(potential_files[:3]):  # Limit to 3 files
+    branch = run.get('head_branch', 'main')
+    
+    for file_path in set(potential_files[:5]):  # Limit to 5 files
+        # Clean up the path
+        file_path = file_path.strip().strip('"').strip("'")
+        if not file_path or file_path.startswith('node_modules'):
+            continue
+            
         try:
-            content = get_file_content(repo, file_path, run.get('head_branch', 'main'))
+            logger.info("Fetching file content: %s from branch %s", file_path, branch)
+            content = get_file_content(repo, file_path, branch)
             if content:
                 decoded = base64.b64decode(content['content']).decode('utf-8')
-                file_contents[file_path] = decoded[:3000]  # Limit size
-        except Exception:
-            pass
+                file_contents[file_path] = {
+                    'content': decoded,
+                    'sha': content['sha']
+                }
+                logger.info("Successfully fetched %s (%d bytes)", file_path, len(decoded))
+        except Exception as e:
+            logger.warning("Could not fetch %s: %s", file_path, str(e))
     
-    files_context = ""
-    if file_contents:
-        files_context = "\n\n## Current File Contents\n"
-        for path, content in file_contents.items():
-            files_context += f"\n### {path}\n```\n{content}\n```\n"
+    if not file_contents:
+        logger.warning("No file contents could be fetched from error logs")
+        return {
+            "fixable": False,
+            "explanation": "Could not identify or fetch the problematic files from the error logs",
+            "files": [],
+            "commit_message": ""
+        }
+    
+    files_context = "\n\n## Current File Contents (from branch)\n"
+    for path, info in file_contents.items():
+        content_preview = info['content'][:2000]  # Limit for prompt
+        files_context += f"\n### File: {path}\n```\n{content_preview}\n```\n"
 
-    prompt = f"""You are an Auto-Healing Agent for CI/CD pipelines. Analyze this failure
-and generate a concrete code fix.
+    prompt = f"""You are an Auto-Healing Agent. A CI/CD pipeline failed. Your job is to fix the code.
 
 ## Pipeline Info
 - Repository: {repo}
 - Workflow: {run.get('name', 'N/A')}
-- Branch: {run.get('head_branch', 'N/A')}
+- Branch: {branch}
 
 ## Failed Jobs
 {job_info}
 
 ## Failed Steps
-{chr(10).join(failed_steps) if failed_steps else '(none identified)'}
+{chr(10).join(failed_steps) if failed_steps else '(none)'}
 
-## Logs (truncated)
-{logs[:10000]}
+## Error Logs
+{logs[:8000]}
 {files_context}
 
-CRITICAL INSTRUCTIONS:
-1. You MUST respond with ONLY valid JSON
-2. NO markdown, NO code fences, NO explanations outside JSON
-3. If fixable=true, you MUST provide complete file content in the "content" field
-4. The "content" field must contain the ENTIRE file with the fix applied, not just the changes
+## Your Task
+1. Identify the root cause from the logs
+2. If it's a code issue (syntax error, missing import, wrong logic), set fixable=true
+3. If it's infrastructure (network, permissions, external service), set fixable=false
+4. If fixable=true, provide the COMPLETE fixed file content
 
-Example of CORRECT response for a missing import:
+## Response Format (JSON only, no markdown)
 {{
     "fixable": true,
-    "explanation": "Missing logger import in app.js causing ReferenceError",
-    "commit_message": "fix: add missing logger import",
+    "explanation": "Brief explanation of the issue and fix",
+    "commit_message": "fix: description",
     "files": [
         {{
-            "path": "src/app.js",
+            "path": "exact/path/from/above.js",
             "action": "update",
-            "content": "const express = require('express');\\nconst logger = require('./utils/logger');\\n\\nconst app = express();\\n\\napp.get('/', (req, res) => {{\\n  logger.info('Request received');\\n  res.send('Hello');\\n}});\\n\\nmodule.exports = app;",
-            "explanation": "Added missing logger import at line 2"
+            "content": "COMPLETE file content with fix applied - must be valid code",
+            "explanation": "What was changed"
         }}
     ]
 }}
 
-Example of CORRECT response for unfixable issue:
-{{
-    "fixable": false,
-    "explanation": "This is a network timeout issue with external service, not fixable via code changes",
-    "commit_message": "",
-    "files": []
-}}
+CRITICAL:
+- If fixable=true, you MUST include at least one file with complete content
+- Use exact file paths from the "Current File Contents" section above
+- Provide the ENTIRE file, not just the changed lines
+- Respond with ONLY the JSON object, nothing else"""
 
-Common fixable issues:
-- Missing imports/requires → Add the import statement
-- Syntax errors → Fix the syntax
-- Undefined variables → Define or import them
-- Test failures due to wrong assertions → Fix the test
-- Lint errors → Fix formatting/style issues
-
-NOT fixable:
-- Network/timeout errors
-- Permission/authentication issues
-- Infrastructure problems
-- External service outages
-
-Now analyze the failure and respond with ONLY the JSON object:"""
-
-    result = invoke_model(prompt, max_tokens=8000)
-
-    # More aggressive cleaning of the response
-    text = result.strip()
-    
-    # Remove markdown code fences
-    if text.startswith("```"):
-        lines = text.split("\n")
-        # Remove first line (```json or ```)
-        lines = lines[1:]
-        # Remove last line if it's ```
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
-    
-    # Remove any leading/trailing text before/after JSON
-    # Find first { and last }
-    start = text.find("{")
-    end = text.rfind("}") + 1
-    
-    if start != -1 and end > start:
-        text = text[start:end]
-    
     try:
+        result = invoke_model(prompt, max_tokens=10000)
+        
+        # Aggressive cleaning
+        text = result.strip()
+        
+        # Remove markdown code fences
+        if text.startswith("```"):
+            lines = text.split("\n")
+            lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+        
+        # Find JSON object
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        
+        if start != -1 and end > start:
+            text = text[start:end]
+        
         parsed = json.loads(text)
         
-        # Validate the structure
+        # Validate
         if not isinstance(parsed, dict):
-            raise ValueError("Response is not a JSON object")
+            raise ValueError("Not a JSON object")
         
-        # Ensure required fields exist
-        if "fixable" not in parsed:
-            parsed["fixable"] = False
-        if "explanation" not in parsed:
-            parsed["explanation"] = "Could not parse AI response properly"
-        if "files" not in parsed:
-            parsed["files"] = []
-        if "commit_message" not in parsed:
-            parsed["commit_message"] = "fix: auto-heal attempt"
+        # Add defaults
+        parsed.setdefault("fixable", False)
+        parsed.setdefault("explanation", "Unknown")
+        parsed.setdefault("files", [])
+        parsed.setdefault("commit_message", "fix: auto-heal")
+        
+        # Store file SHAs for later use
+        if parsed.get("fixable") and parsed.get("files"):
+            for file_info in parsed["files"]:
+                path = file_info.get("path")
+                if path in file_contents:
+                    file_info["_sha"] = file_contents[path]["sha"]
+        
+        logger.info("AI response: fixable=%s, files=%d", 
+                   parsed.get("fixable"), len(parsed.get("files", [])))
         
         return parsed
         
     except (json.JSONDecodeError, ValueError) as e:
-        logger.error("Failed to parse AI fix response: %s\nOriginal: %s", str(e), text[:500])
+        logger.error("JSON parse error: %s\nResponse preview: %s", str(e), result[:500])
         
-        # Try to extract useful information even if JSON parsing failed
-        # Check if the AI said it's not fixable
-        if "not fixable" in result.lower() or "cannot fix" in result.lower() or "infrastructure" in result.lower():
+        # Fallback: check if AI said not fixable
+        if any(word in result.lower() for word in ["not fixable", "cannot fix", "infrastructure", "network", "permission"]):
             return {
                 "fixable": False,
-                "explanation": "AI determined the issue is not auto-fixable (infrastructure or unclear root cause)",
+                "explanation": "AI determined this is not a code issue that can be auto-fixed",
                 "files": [],
                 "commit_message": ""
             }
         
         return {
             "fixable": False,
-            "explanation": f"AI response was not valid JSON. Error: {str(e)}",
+            "explanation": f"Failed to parse AI response: {str(e)}",
+            "files": [],
+            "commit_message": ""
+        }
+    except Exception as e:
+        logger.exception("Unexpected error in generate_fix")
+        return {
+            "fixable": False,
+            "explanation": f"Error generating fix: {str(e)}",
             "files": [],
             "commit_message": ""
         }
@@ -211,8 +227,13 @@ def apply_fix(repo: str, branch: str, fix: dict, run_id: int = None) -> dict:
 
         try:
             if action == "update":
-                existing = get_file_content(repo, path, branch)
-                file_sha = existing["sha"]
+                # Use stored SHA if available, otherwise fetch
+                file_sha = file_info.get("_sha")
+                if not file_sha:
+                    existing = get_file_content(repo, path, branch)
+                    file_sha = existing["sha"]
+                
+                logger.info("Updating file: %s (sha: %s)", path, file_sha[:8])
                 update_file(
                     repo, path, content_b64,
                     message=f"🤖 auto-heal: {file_info.get('explanation', 'fix')}",
@@ -220,6 +241,7 @@ def apply_fix(repo: str, branch: str, fix: dict, run_id: int = None) -> dict:
                     file_sha=file_sha,
                 )
             else:
+                logger.info("Creating file: %s", path)
                 create_file(
                     repo, path, content_b64,
                     message=f"🤖 auto-heal: {file_info.get('explanation', 'new file')}",
@@ -227,10 +249,10 @@ def apply_fix(repo: str, branch: str, fix: dict, run_id: int = None) -> dict:
                 )
 
             files_changed.append(path)
-            logger.info("    Fixed: %s", path)
+            logger.info("    ✅ Fixed: %s", path)
 
-        except Exception:
-            logger.exception("    Failed to fix: %s", path)
+        except Exception as e:
+            logger.exception("    ❌ Failed to fix: %s - %s", path, str(e))
 
     if not files_changed:
         logger.warning("No files were changed — skipping")
@@ -253,11 +275,13 @@ The SynapseOps agent detected a pipeline failure and pushed a fix to this branch
 **Files Fixed:**
 {chr(10).join(f'- `{f}`' for f in files_changed)}
 
+**Commit Message:** {fix.get('commit_message', 'N/A')}
+
 The pipeline will re-run automatically with the new changes. Please review the fix.
 """
         try:
             post_pr_comment(repo, pr_number, comment_body)
-            logger.info("    Commented on PR #%s", pr_number)
+            logger.info("    ✅ Commented on PR #%s", pr_number)
         except Exception:
             logger.exception("    Failed to comment on PR #%s", pr_number)
 
@@ -268,7 +292,7 @@ The pipeline will re-run automatically with the new changes. Please review the f
         try:
             rerun_triggered = rerun_workflow(repo, run_id)
             if rerun_triggered:
-                logger.info("    Re-triggered pipeline run %s", run_id)
+                logger.info("    ✅ Re-triggered pipeline run %s", run_id)
         except Exception:
             logger.exception("    Failed to re-trigger pipeline")
 
