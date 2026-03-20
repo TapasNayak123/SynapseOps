@@ -49,6 +49,28 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
             if step.get("conclusion") == "failure":
                 failed_steps.append(f"  [{job['name']}] {step['name']}")
 
+    # Try to extract file paths from error logs
+    import re
+    file_pattern = r'(?:at|in|from)\s+([a-zA-Z0-9_/.-]+\.(?:js|ts|jsx|tsx|py|java|go))'
+    potential_files = re.findall(file_pattern, logs[:5000])
+    
+    # Fetch content of potential problem files
+    file_contents = {}
+    for file_path in set(potential_files[:3]):  # Limit to 3 files
+        try:
+            content = get_file_content(repo, file_path, run.get('head_branch', 'main'))
+            if content:
+                decoded = base64.b64decode(content['content']).decode('utf-8')
+                file_contents[file_path] = decoded[:3000]  # Limit size
+        except Exception:
+            pass
+    
+    files_context = ""
+    if file_contents:
+        files_context = "\n\n## Current File Contents\n"
+        for path, content in file_contents.items():
+            files_context += f"\n### {path}\n```\n{content}\n```\n"
+
     prompt = f"""You are an Auto-Healing Agent for CI/CD pipelines. Analyze this failure
 and generate a concrete code fix.
 
@@ -65,32 +87,51 @@ and generate a concrete code fix.
 
 ## Logs (truncated)
 {logs[:10000]}
+{files_context}
 
-CRITICAL: You MUST respond with ONLY valid JSON. No markdown, no code fences, no explanations outside the JSON.
+CRITICAL INSTRUCTIONS:
+1. You MUST respond with ONLY valid JSON
+2. NO markdown, NO code fences, NO explanations outside JSON
+3. If fixable=true, you MUST provide complete file content in the "content" field
+4. The "content" field must contain the ENTIRE file with the fix applied, not just the changes
 
-Response format:
+Example of CORRECT response for a missing import:
 {{
     "fixable": true,
-    "explanation": "one paragraph explaining the root cause and fix",
-    "commit_message": "fix: short description",
+    "explanation": "Missing logger import in app.js causing ReferenceError",
+    "commit_message": "fix: add missing logger import",
     "files": [
         {{
-            "path": "relative/path/to/file.js",
+            "path": "src/app.js",
             "action": "update",
-            "content": "complete file content here",
-            "explanation": "what changed"
+            "content": "const express = require('express');\\nconst logger = require('./utils/logger');\\n\\nconst app = express();\\n\\napp.get('/', (req, res) => {{\\n  logger.info('Request received');\\n  res.send('Hello');\\n}});\\n\\nmodule.exports = app;",
+            "explanation": "Added missing logger import at line 2"
         }}
     ]
 }}
 
-Rules:
-- Set fixable=false if infrastructure issue (network, permissions, service outage)
-- Set fixable=false if cannot determine exact fix
-- Only include files you are confident need changing
-- Provide COMPLETE file content, not diffs
-- Common fixable: syntax errors, missing imports, test failures, lint errors
-- If fixable=true, MUST include at least one file
-- RESPOND WITH ONLY THE JSON OBJECT, NOTHING ELSE"""
+Example of CORRECT response for unfixable issue:
+{{
+    "fixable": false,
+    "explanation": "This is a network timeout issue with external service, not fixable via code changes",
+    "commit_message": "",
+    "files": []
+}}
+
+Common fixable issues:
+- Missing imports/requires → Add the import statement
+- Syntax errors → Fix the syntax
+- Undefined variables → Define or import them
+- Test failures due to wrong assertions → Fix the test
+- Lint errors → Fix formatting/style issues
+
+NOT fixable:
+- Network/timeout errors
+- Permission/authentication issues
+- Infrastructure problems
+- External service outages
+
+Now analyze the failure and respond with ONLY the JSON object:"""
 
     result = invoke_model(prompt, max_tokens=8000)
 
