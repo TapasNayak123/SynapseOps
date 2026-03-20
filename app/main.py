@@ -200,21 +200,36 @@ def test_pr_post(request: Request, repo: str = Form(""), pr_number: str = Form("
 
     try:
         pr_num = int(pr_number_str)
+        py_logger.info("Test PR: Starting analysis for %s #%s", repo, pr_num)
+        
         pr_details = get_pr_details(repo, pr_num)
+        py_logger.info("Test PR: Fetched PR details")
+        
         diff = get_pr_diff(repo, pr_num)
+        py_logger.info("Test PR: Fetched diff (%d chars)", len(diff))
+        
         files = get_pr_files(repo, pr_num)
+        py_logger.info("Test PR: Fetched %d files", len(files))
 
         desc_generated = check_and_generate_description(pr_details, diff, files, repo, pr_num)
+        py_logger.info("Test PR: Description check complete (generated=%s)", desc_generated)
+        
         conflicts = check_conflicts(repo, pr_num, files,
                                     pr_title=pr_details.get("title", ""),
                                     pr_author=pr_details.get("user", {}).get("login", ""))
+        py_logger.info("Test PR: Conflict check complete (%d conflicts)", len(conflicts))
+        
         summary = supervisor(pr_details, diff, files, repo, pr_num)
+        py_logger.info("Test PR: Supervisor complete, summary length=%d", len(summary))
 
         posted = False
         if post_comment:
+            py_logger.info("Test PR: Posting comment to GitHub...")
             post_pr_comment(repo, pr_num, summary)
             posted = True
+            py_logger.info("Test PR: Comment posted successfully")
 
+        py_logger.info("Test PR: Analysis complete for %s #%s", repo, pr_num)
         return templates.TemplateResponse("test.html", {**ctx, "result": {
             "summary": summary, "posted": posted, "repo": repo,
             "pr_number": pr_num, "desc_generated": desc_generated, "conflicts": conflicts,
@@ -238,14 +253,15 @@ def api_pr_metrics():
 
 @app.get("/api/prs")
 def api_prs():
+    records = pr_store.all()
     return [
         {
             "repo": r.repo, "pr_number": r.pr_number, "title": r.title,
             "author": r.author, "risk_level": r.risk_level,
             "files_changed": r.files_changed, "total_duration_ms": r.total_duration_ms,
-            "timestamp": r.timestamp,
+            "timestamp": r.timestamp, "pr_type": r.pr_type, "priority": r.priority,
         }
-        for r in pr_store.all()
+        for r in records
     ]
 
 
