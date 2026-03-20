@@ -863,6 +863,9 @@
         const container = document.getElementById('notificationContainer');
         const toast = document.createElement('div');
         
+        // Escape helper for user-provided data
+        function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+        
         let icon = '📢';
         let color = '#58a6ff';
         let title = 'Notification';
@@ -870,8 +873,8 @@
         
         if (data.notification_type === 'pr_analyzed') {
             icon = '🔍';
-            title = `PR #${data.pr_number} Analyzed`;
-            message = `${data.repo} - ${data.risk_level} risk`;
+            title = `PR #${esc(String(data.pr_number))} Analyzed`;
+            message = `${esc(data.repo)} - ${esc(data.risk_level)} risk`;
             
             if (data.risk_level === 'High') {
                 color = '#f85149';
@@ -887,9 +890,9 @@
                 <div style="display:flex;align-items:start;gap:12px;">
                     <div style="font-size:24px;">${icon}</div>
                     <div style="flex:1;">
-                        <div style="font-weight:700;color:#f0f6fc;margin-bottom:4px;">${title}</div>
-                        <div style="font-size:13px;color:#8b949e;">${message}</div>
-                        ${data.pr_number ? `<a href="/pr/${data.repo}/${data.pr_number}" style="font-size:12px;color:${color};margin-top:6px;display:inline-block;">View Details →</a>` : ''}
+                        <div style="font-weight:700;color:#f0f6fc;margin-bottom:4px;">${esc(title)}</div>
+                        <div style="font-size:13px;color:#8b949e;">${esc(message)}</div>
+                        ${data.pr_number ? `<a href="/pr/${data.repo.split('/').map(encodeURIComponent).join('/')}/${parseInt(data.pr_number)}" style="font-size:12px;color:${color};margin-top:6px;display:inline-block;">View Details →</a>` : ''}
                     </div>
                     <button onclick="event.stopPropagation();this.closest('[style*=background]').parentElement.remove()" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:18px;padding:0;line-height:1;">×</button>
                 </div>
