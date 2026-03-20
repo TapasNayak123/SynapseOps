@@ -288,6 +288,28 @@ def supervisor(pr_details: dict, diff: str, files: list[dict], repo: str, pr_num
 
     activity_log.emit("Supervisor", "completed", f"All agents finished — {pr_type} | {priority} | Risk: {risk}", repo=repo, pr_number=pr_number, duration_ms=total_dur)
 
+    # Broadcast PR notification via WebSocket
+    try:
+        import asyncio
+        from app.services.websocket_manager import get_websocket_manager
+        manager = get_websocket_manager()
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(manager.broadcast_notification({
+                "notification_type": "pr_analyzed",
+                "repo": repo,
+                "pr_number": pr_number,
+                "title": record.title,
+                "author": record.author,
+                "risk_level": risk,
+                "pr_type": pr_type,
+                "priority": priority,
+                "files_changed": len(files),
+                "timestamp": time.time(),
+            }))
+    except Exception:
+        pass  # Silently fail if WebSocket not available
+
     # Send Teams notification
     send_teams_notification(
         repo=repo,

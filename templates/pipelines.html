@@ -82,6 +82,40 @@
 </div>
 
 <script>
-setTimeout(() => { if (!window.chatOpen) location.reload(); }, 30000);
+// Auto-refresh every 30 seconds using AJAX (no page reload)
+function autoRefresh() {
+    updatePipelinesData();
+    setTimeout(autoRefresh, 30000);
+}
+
+async function updatePipelinesData() {
+    // Skip update if chat is open
+    if (window.chatOpen) {
+        console.log('Skipping pipelines update - chat is open');
+        return;
+    }
+    
+    try {
+        // Fetch updated pipeline data
+        const resp = await fetch('/api/pipelines');
+        if (!resp.ok) return;
+        
+        const data = await resp.json();
+        
+        // Update stats if available
+        if (data.stats) {
+            const statCards = document.querySelectorAll('.stat-card .value');
+            if (statCards[0]) statCards[0].textContent = data.stats.total || 0;
+            if (statCards[1]) statCards[1].textContent = data.stats.failed || 0;
+            if (statCards[2]) statCards[2].textContent = data.stats.success_rate ? `${data.stats.success_rate}%` : '0%';
+        }
+        
+        console.log('Pipelines updated via AJAX');
+    } catch (error) {
+        console.error('Failed to update pipelines:', error);
+    }
+}
+
+setTimeout(autoRefresh, 30000);
 </script>
 {% endblock %}

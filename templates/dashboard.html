@@ -79,7 +79,60 @@
 </div>
 
 <script>
-// Auto-refresh every 30 seconds
-setTimeout(() => { if (!window.chatOpen) location.reload(); }, 30000);
+// Auto-refresh every 30 seconds (only if chat is not open)
+// Use AJAX to update content instead of full page reload
+function autoRefresh() {
+    if (!window.chatOpen) {
+        // Use AJAX to update the dashboard data
+        updateDashboardData();
+    }
+    // Schedule next refresh
+    setTimeout(autoRefresh, 30000);
+}
+
+async function updateDashboardData() {
+    try {
+        // Fetch updated stats
+        const statsResp = await fetch('/api/stats');
+        const stats = await statsResp.json();
+        
+        // Update stats cards
+        document.querySelector('.stat-card:nth-child(1) .value').textContent = stats.total || 0;
+        
+        // Fetch updated PRs
+        const prsResp = await fetch('/api/prs');
+        const prs = await prsResp.json();
+        
+        // Update PR table (keep scroll position)
+        const tbody = document.querySelector('table tbody');
+        if (tbody && prs.length > 0) {
+            const scrollPos = window.scrollY;
+            // Only update if there are new PRs
+            const currentCount = tbody.querySelectorAll('tr').length;
+            if (prs.length !== currentCount) {
+                // Rebuild table rows
+                tbody.innerHTML = prs.slice(0, 20).map(pr => `
+                    <tr>
+                        <td><a href="/pr/${pr.repo}/${pr.pr_number}">#${pr.pr_number}</a></td>
+                        <td>${pr.repo}</td>
+                        <td><span class="badge">${pr.pr_type || 'N/A'}</span></td>
+                        <td><span class="badge">${pr.priority || 'N/A'}</span></td>
+                        <td>${pr.author}</td>
+                        <td>${pr.files_changed}</td>
+                        <td><span class="badge badge-${(pr.risk_level || 'unknown').toLowerCase()}">${pr.risk_level || 'Unknown'}</span></td>
+                        <td>${(pr.total_duration_ms / 1000).toFixed(1)}s</td>
+                    </tr>
+                `).join('');
+                window.scrollTo(0, scrollPos);
+            }
+        }
+        
+        console.log('Dashboard updated via AJAX');
+    } catch (error) {
+        console.error('Failed to update dashboard:', error);
+    }
+}
+
+setTimeout(autoRefresh, 30000);
 </script>
 {% endblock %}

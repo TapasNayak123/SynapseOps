@@ -36,7 +36,7 @@ env:
   ALERT_COOLDOWN_MINUTES: "60"
   CHAT_RATE_LIMIT_PER_MINUTE: "30"
   POLL_INTERVAL: "60"
-  APP_BASE_URL: "http://k8s-default-synapseo-09c4e75799-e53dca61e781f182.elb.us-east-1.amazonaws.com"
+  APP_BASE_URL: "http://k8s-default-synapseo-c24cd86152-c2217fb71b44965d.elb.us-east-1.amazonaws.com"
 
 secrets:
   TEAMS_WEBHOOK_URL: ""
