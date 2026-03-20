@@ -66,41 +66,93 @@ and generate a concrete code fix.
 ## Logs (truncated)
 {logs[:10000]}
 
-Respond in STRICT JSON format (no markdown, no code fences):
+CRITICAL: You MUST respond with ONLY valid JSON. No markdown, no code fences, no explanations outside the JSON.
+
+Response format:
 {{
-    "fixable": true or false,
+    "fixable": true,
     "explanation": "one paragraph explaining the root cause and fix",
-    "commit_message": "fix: short description of the fix",
+    "commit_message": "fix: short description",
     "files": [
         {{
-            "path": "relative/path/to/file",
-            "action": "update" or "create",
-            "content": "full file content with the fix applied",
-            "explanation": "what was changed and why"
+            "path": "relative/path/to/file.js",
+            "action": "update",
+            "content": "complete file content here",
+            "explanation": "what changed"
         }}
     ]
 }}
 
 Rules:
-- Set fixable=false if the issue is infrastructure-related (network, permissions, service outage)
-- Set fixable=false if you cannot determine the exact fix from the logs
+- Set fixable=false if infrastructure issue (network, permissions, service outage)
+- Set fixable=false if cannot determine exact fix
 - Only include files you are confident need changing
-- Provide the COMPLETE file content for each file, not just the diff
-- Common fixable issues: syntax errors, missing imports, test failures, lint errors, dependency versions
-- If fixable=true, you MUST include at least one file in the files array"""
+- Provide COMPLETE file content, not diffs
+- Common fixable: syntax errors, missing imports, test failures, lint errors
+- If fixable=true, MUST include at least one file
+- RESPOND WITH ONLY THE JSON OBJECT, NOTHING ELSE"""
 
     result = invoke_model(prompt, max_tokens=8000)
 
+    # More aggressive cleaning of the response
     text = result.strip()
+    
+    # Remove markdown code fences
     if text.startswith("```"):
-        text = text.split("\n", 1)[1]
-        text = text.rsplit("```", 1)[0]
-
+        lines = text.split("\n")
+        # Remove first line (```json or ```)
+        lines = lines[1:]
+        # Remove last line if it's ```
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    
+    # Remove any leading/trailing text before/after JSON
+    # Find first { and last }
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    
+    if start != -1 and end > start:
+        text = text[start:end]
+    
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        logger.error("Failed to parse AI fix response: %s", text[:500])
-        return {"fixable": False, "explanation": "AI response was not valid JSON", "files": [], "commit_message": ""}
+        parsed = json.loads(text)
+        
+        # Validate the structure
+        if not isinstance(parsed, dict):
+            raise ValueError("Response is not a JSON object")
+        
+        # Ensure required fields exist
+        if "fixable" not in parsed:
+            parsed["fixable"] = False
+        if "explanation" not in parsed:
+            parsed["explanation"] = "Could not parse AI response properly"
+        if "files" not in parsed:
+            parsed["files"] = []
+        if "commit_message" not in parsed:
+            parsed["commit_message"] = "fix: auto-heal attempt"
+        
+        return parsed
+        
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error("Failed to parse AI fix response: %s\nOriginal: %s", str(e), text[:500])
+        
+        # Try to extract useful information even if JSON parsing failed
+        # Check if the AI said it's not fixable
+        if "not fixable" in result.lower() or "cannot fix" in result.lower() or "infrastructure" in result.lower():
+            return {
+                "fixable": False,
+                "explanation": "AI determined the issue is not auto-fixable (infrastructure or unclear root cause)",
+                "files": [],
+                "commit_message": ""
+            }
+        
+        return {
+            "fixable": False,
+            "explanation": f"AI response was not valid JSON. Error: {str(e)}",
+            "files": [],
+            "commit_message": ""
+        }
 
 
 def apply_fix(repo: str, branch: str, fix: dict, run_id: int = None) -> dict:
