@@ -73,6 +73,10 @@ async def lifespan(app: FastAPI):
 
     py_logger.info("Webhook mode active — listening on /webhook for PR and pipeline events.")
 
+    # Store event loop reference so background threads can broadcast to WebSocket
+    import asyncio as _aio
+    activity_log.set_event_loop(_aio.get_running_loop())
+
     yield
 
     try:

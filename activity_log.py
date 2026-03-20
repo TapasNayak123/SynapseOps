@@ -46,26 +46,40 @@ class ActivityLog:
         self._broadcast_to_websocket(entry)
 
     def _broadcast_to_websocket(self, entry: LogEntry):
-        """Broadcast activity to WebSocket clients (non-blocking)."""
+        """Broadcast activity to WebSocket clients (non-blocking, thread-safe)."""
         try:
             from app.services.websocket_manager import get_websocket_manager
             manager = get_websocket_manager()
-            
-            # Create a task to broadcast without blocking
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(manager.broadcast_activity({
-                    "agent": entry.agent,
-                    "event": entry.event,
-                    "message": entry.message,
-                    "repo": entry.repo,
-                    "pr_number": entry.pr_number,
-                    "duration_ms": entry.duration_ms,
-                    "timestamp": entry.timestamp,
-                }))
+            if not manager.activity_connections:
+                return
+
+            event_dict = {
+                "agent": entry.agent,
+                "event": entry.event,
+                "message": entry.message,
+                "repo": entry.repo,
+                "pr_number": entry.pr_number,
+                "duration_ms": entry.duration_ms,
+                "timestamp": entry.timestamp,
+            }
+
+            # Try to schedule on the running event loop (works from async context)
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(manager.broadcast_activity(event_dict))
+            except RuntimeError:
+                # Called from a background thread — use run_coroutine_threadsafe
+                # We need to find the main uvicorn event loop
+                if hasattr(self, '_loop') and self._loop and self._loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        manager.broadcast_activity(event_dict), self._loop
+                    )
         except Exception:
-            # Silently fail if WebSocket not available (e.g., during startup)
-            pass
+            pass  # Never let WS errors break the activity log
+
+    def set_event_loop(self, loop):
+        """Store a reference to the main event loop for cross-thread broadcasting."""
+        self._loop = loop
 
     def all(self) -> list[LogEntry]:
         with self._lock:

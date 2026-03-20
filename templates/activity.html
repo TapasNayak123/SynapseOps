@@ -280,6 +280,9 @@ updateStats();
 // Start WebSocket connection
 connectWebSocket();
 
+// Also start polling as backup (WebSocket may fail from background threads)
+setInterval(pollFallback, 5000);
+
 // Pause/resume based on page visibility
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
