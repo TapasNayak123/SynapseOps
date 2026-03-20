@@ -41,6 +41,14 @@
         <div style="display:flex; align-items:center; gap:10px;">
             <select id="filterAgent" class="filter-select" onchange="applyFilters()">
                 <option value="">All Agents</option>
+                <option value="Pipeline Monitor">Pipeline Monitor</option>
+                <option value="Pipeline Analyzer">Pipeline Analyzer</option>
+                <option value="Auto-Healer">Auto-Healer</option>
+                <option value="PR Reviewer">PR Reviewer</option>
+                <option value="Deployment Gate">Deployment Gate</option>
+                <option value="Conflict Detector">Conflict Detector</option>
+                <option value="Error Monitor">Error Monitor</option>
+                <option value="SLA Monitor">SLA Monitor</option>
             </select>
             <select id="filterEvent" class="filter-select" onchange="applyFilters()">
                 <option value="">All Events</option>
@@ -302,20 +310,22 @@ window.addEventListener('beforeunload', () => {
 });
 
 // ── Filters ──
-const knownAgents = new Set();
 
 function rebuildAgentDropdown() {
+    const sel = document.getElementById('filterAgent');
+    // Collect agents already in dropdown
+    const existing = new Set();
+    sel.querySelectorAll('option').forEach(o => { if (o.value) existing.add(o.value); });
+    // Add any new agents from live rows
     document.querySelectorAll('.log-row').forEach(r => {
         const a = r.getAttribute('data-agent');
-        if (a) knownAgents.add(a);
+        if (a && !existing.has(a)) {
+            existing.add(a);
+            const opt = document.createElement('option');
+            opt.value = a; opt.textContent = a;
+            sel.appendChild(opt);
+        }
     });
-    const sel = document.getElementById('filterAgent');
-    const current = sel.value;
-    const opts = ['<option value="">All Agents</option>'];
-    [...knownAgents].sort().forEach(a => {
-        opts.push(`<option value="${a}"${a === current ? ' selected' : ''}>${a}</option>`);
-    });
-    sel.innerHTML = opts.join('');
 }
 
 function applyFilters() {
