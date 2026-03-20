@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 import structlog
 
 from app.config import get_settings
-from app.routes import metrics, chat, alerts
+from app.routes import metrics, chat, alerts, websockets
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 # Root-level imports (PR analysis pipeline)
@@ -98,10 +98,11 @@ class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(NoCacheHTMLMiddleware)
 
-# Include FastAPI routers (monitoring, chat, alerts)
+# Include FastAPI routers (monitoring, chat, alerts, websockets)
 app.include_router(metrics.router)
 app.include_router(chat.router)
 app.include_router(alerts.router)
+app.include_router(websockets.router)
 
 # Static files
 if STATIC_DIR.is_dir():
