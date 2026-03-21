@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SynapseOps — Speaker Notes (1 Hour)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#fafbff;--card:#ffffff;--primary:#4361ee;--accent:#7209b7;--dark:#1a1a2e;--text:#2b2d42;--muted:#6c757d;--border:#e3e6f0;--green:#06d6a0;--orange:#ff9f1c;--red:#ef476f;--blue-bg:#eef1ff;--green-bg:#e8faf4;--orange-bg:#fff8ec;--red-bg:#fdeef1}
+body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;max-width:960px;margin:0 auto;padding:40px 32px 80px}
+
+h1{font-size:2em;color:var(--dark);margin-bottom:4px}
+.doc-subtitle{color:var(--muted);font-size:1.05em;margin-bottom:8px}
+.time-bar{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;padding:14px 24px;border-radius:10px;margin:20px 0 36px;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:0.95em}
+.time-bar span{opacity:0.85;font-weight:400}
+
+.slide-section{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:28px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.slide-header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--border);background:#f8f9fc}
+.slide-header h2{font-size:1.15em;color:var(--dark);display:flex;align-items:center;gap:10px}
+.slide-num{background:var(--primary);color:#fff;width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.8em;font-weight:700;flex-shrink:0}
+.time-badge{background:var(--blue-bg);color:var(--primary);padding:5px 14px;border-radius:20px;font-size:0.82em;font-weight:600;white-space:nowrap}
+
+.slide-body{padding:20px 24px}
+.slide-body h3{font-size:1em;font-weight:700;color:var(--dark);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.slide-body h3:first-child{margin-top:0}
+.slide-body p{margin:0 0 12px;font-size:0.94em;color:var(--text)}
+.slide-body ul{margin:0 0 14px 20px;font-size:0.93em}
+.slide-body li{margin-bottom:5px;color:var(--text)}
+
+.talk-point{background:var(--blue-bg);border-left:3px solid var(--primary);padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0;font-size:0.92em}
+.talk-point strong{color:var(--primary)}
+
+.key-phrase{background:var(--green-bg);border-left:3px solid var(--green);padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0;font-size:0.92em}
+.key-phrase strong{color:#059669}
+
+.warning{background:var(--orange-bg);border-left:3px solid var(--orange);padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0;font-size:0.92em}
+.warning strong{color:#d97706}
+
+.demo-note{background:var(--red-bg);border-left:3px solid var(--red);padding:12px 16px;border-radius:0 8px 8px 0;margin:10px 0;font-size:0.92em}
+.demo-note strong{color:var(--red)}
+
+.transition{color:var(--muted);font-style:italic;font-size:0.88em;padding:8px 0;border-top:1px dashed var(--border);margin-top:14px}
+
+.qa-section{background:linear-gradient(135deg,rgba(67,97,238,0.05),rgba(114,9,183,0.05));border:2px solid var(--primary);border-radius:14px;padding:24px;margin:32px 0}
+.qa-section h2{color:var(--primary);margin-bottom:16px;font-size:1.2em}
+.qa-item{margin-bottom:14px}
+.qa-item .q{font-weight:700;color:var(--dark);font-size:0.95em}
+.qa-item .a{color:var(--text);font-size:0.92em;margin-top:4px;padding-left:16px;border-left:2px solid var(--border)}
+
+@media print{
+  body{padding:20px;font-size:10pt}
+  .slide-section{page-break-inside:avoid;box-shadow:none}
+  .time-bar{background:var(--dark) !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<h1>⚡ SynapseOps — Speaker Notes</h1>
+<p class="doc-subtitle">1-Hour Presentation Guide for Management</p>
+
+<div class="time-bar">
+  <div>Total Time: 60 minutes</div>
+  <span>45 min presentation + 15 min Q&A</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">1</span> Title Slide</h2>
+    <span class="time-badge">⏱ 1 minute</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>Open with a brief greeting and set the stage:</p>
+    <div class="talk-point">
+      <strong>Say:</strong> "Good [morning/afternoon]. Today I'm going to walk you through SynapseOps — an AI-powered DevOps platform that we've built to fundamentally change how we monitor production, review code, and handle incidents. The tagline is <em>Intelligent Observability, Automated Healing, Zero Downtime</em> — and by the end of this hour, you'll see exactly why."
+    </div>
+    <div class="talk-point">
+      <strong>Explain the name:</strong> "Before I dive in — why the name SynapseOps? In biology, a <em>synapse</em> is the junction between nerve cells where signals are transmitted, triggering rapid, intelligent responses. That's exactly what this platform does — it's the nervous system of our DevOps workflow. It connects GitHub, CloudWatch, Kubernetes, and Teams, and every signal triggers an autonomous, intelligent action. The name isn't random — it captures the core idea."
+    </div>
+    <div class="key-phrase">
+      <strong>Key message:</strong> This is not just another monitoring tool. It's an autonomous system that thinks, decides, and acts — reducing human toil and catching problems before users notice.
+    </div>
+    <p class="transition">→ Transition: "Let me start by explaining the problem we set out to solve."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">2</span> The Problem — Why We Built SynapseOps</h2>
+    <span class="time-badge">⏱ 4 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>Walk through each of the four pain points. Make it relatable — your managers have felt these pains:</p>
+
+    <div class="talk-point">
+      <strong>Pain 1 — Manual Incident Response:</strong> "When something breaks in production, what happens? An engineer gets paged, opens CloudWatch, starts reading logs line by line, tries to correlate timestamps, checks if a deployment happened recently... This can take 30 minutes to hours. Meanwhile, users are affected."
+    </div>
+
+    <div class="talk-point">
+      <strong>Pain 2 — Slow Code Reviews:</strong> "PRs sit in queues. Reviewers are busy. When they do review, there's no consistent risk assessment — a one-line config change gets the same treatment as a 500-line refactor touching authentication code. We needed a way to triage and provide instant first-pass analysis."
+    </div>
+
+    <div class="talk-point">
+      <strong>Pain 3 — Pipeline Failures:</strong> "A CI/CD build fails. The developer has to stop what they're doing, go read build logs, figure out what broke, fix it, push again. This context-switching kills productivity. What if the system could diagnose and fix common failures itself?"
+    </div>
+
+    <div class="talk-point">
+      <strong>Pain 4 — Risky Deployments:</strong> "We deploy to production without knowing if the environment is already degraded. If error rates are spiking and we push a new release on top of that, we're making a bad situation worse. We needed an intelligent gate."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Core message to land:</strong> "The fundamental problem is that DevOps teams are <em>reactive</em>. We wait for things to break, then scramble. SynapseOps flips this — it's <em>proactive</em>. It monitors, predicts, and acts autonomously."
+    </div>
+
+    <p class="transition">→ Transition: "So what exactly did we build? Let me give you the overview."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">3</span> What is SynapseOps — Solution Overview</h2>
+    <span class="time-badge">⏱ 3 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <div class="talk-point">
+      <strong>Opening:</strong> "SynapseOps is an AI-powered platform that does four major things: it reviews every pull request with multiple AI agents, it auto-heals pipeline failures, it continuously monitors production APIs with predictive alerting, and it gates deployments based on real-time traffic health. All of this happens with zero human intervention."
+    </div>
+
+    <p>Point to the stats:</p>
+    <ul>
+      <li><strong>6 AI Agents</strong> — "Six specialized AI agents work on every PR, each looking at the code from a different angle."</li>
+      <li><strong>18 Chat Intents</strong> — "Our chat interface understands 18 different types of infrastructure questions in plain English."</li>
+      <li><strong>7 Monitoring Jobs</strong> — "Seven background jobs run continuously — error monitoring, anomaly detection, SLA tracking, and more."</li>
+      <li><strong>40+ API Endpoints</strong> — "The platform exposes over 40 REST and WebSocket endpoints for the dashboard, chat, metrics, and alerts."</li>
+    </ul>
+
+    <p>Quickly scan the badge row:</p>
+    <div class="talk-point">
+      <strong>Say:</strong> "These are the eight major capabilities — Multi-Agent PR Review, Auto-Healing Pipelines, Real-Time Monitoring, AI Deployment Gate, Natural Language Chat, Teams Notifications, Anomaly Detection, and WebSocket real-time updates. I'll deep-dive into each of these."
+    </div>
+
+    <p class="transition">→ Transition: "Let me walk you through each capability in detail, starting with the one that runs on every single PR."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">4</span> Six Pillars of Intelligent DevOps</h2>
+    <span class="time-badge">⏱ 5 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>This is a high-level overview slide. Spend about 45 seconds on each card. Don't go too deep — the deep dives come later.</p>
+
+    <div class="talk-point">
+      <strong>1. Multi-Agent PR Analysis:</strong> "Every PR gets analyzed by 5 specialized AI agents — one looks at the diff, one reviews code quality, one generates a summary, one assesses risk, and a supervisor consolidates everything. It also auto-generates PR descriptions and detects conflicts with other open PRs."
+    </div>
+
+    <div class="talk-point">
+      <strong>2. Pipeline Auto-Healing:</strong> "When a CI/CD pipeline fails, SynapseOps fetches the build logs, uses AI to identify the root cause, categorizes the error into one of 12 types, and if it's auto-fixable, generates a code fix and opens a PR — all automatically."
+    </div>
+
+    <div class="talk-point">
+      <strong>3. Real-Time API Monitoring:</strong> "We continuously query CloudWatch Logs to track error rates, latency percentiles — p50, p95, p99 — and request volumes. Each API gets a composite health score."
+    </div>
+
+    <div class="talk-point">
+      <strong>4. AI Deployment Gate:</strong> "Before any deployment to production, AI evaluates the current traffic health. If error rates are high or latency is spiking, it holds the deployment and auto-releases when conditions improve."
+    </div>
+
+    <div class="talk-point">
+      <strong>5. Predictive Analytics:</strong> "We don't just alert when thresholds are breached — we predict when they <em>will be</em> breached. Linear regression on error trends can warn us 20 minutes before an incident. Z-score analysis catches unusual traffic patterns."
+    </div>
+
+    <div class="talk-point">
+      <strong>6. Natural Language Chat:</strong> "Anyone on the team can ask questions like 'What are the top errors today?' or 'Show me slow APIs' or 'Check SLA for the login endpoint'. The system fetches real data and generates a grounded response — it never makes things up."
+    </div>
+
+    <p class="transition">→ Transition: "Now let me show you the architecture that makes all of this possible."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">5</span> Platform Architecture</h2>
+    <span class="time-badge">⏱ 4 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>Walk through the architecture diagram top-to-bottom:</p>
+
+    <div class="talk-point">
+      <strong>Browser Layer:</strong> "At the top, we have the UI — a web dashboard with pages for the main dashboard, pipelines, metrics, activity log, and PR details. Every page includes a chat widget and receives real-time updates via WebSocket."
+    </div>
+
+    <div class="talk-point">
+      <strong>FastAPI Application:</strong> "The core is a FastAPI application running on port 5000. It has three main components:
+      <br>• <em>Routes</em> — webhook handler, REST APIs, page routes, WebSocket endpoints
+      <br>• <em>Services</em> — the business logic layer with 20+ specialized services
+      <br>• <em>Background</em> — APScheduler running 7 monitoring jobs, plus daemon threads for webhook processing"
+    </div>
+
+    <div class="talk-point">
+      <strong>External Services:</strong> "We integrate with seven external services:
+      <br>• <em>Amazon Bedrock</em> — for all AI/LLM inference. We support Claude, Nova, and Llama models.
+      <br>• <em>DynamoDB</em> — 5 tables for PRs, pipelines, alerts, metrics, and audit logs.
+      <br>• <em>CloudWatch Logs</em> — we query the target application's logs using Logs Insights.
+      <br>• <em>Redis</em> — caching, rate limiting, deduplication. Gracefully degrades if unavailable.
+      <br>• <em>GitHub API</em> — PR data, diffs, comments, merges, file operations, workflow runs.
+      <br>• <em>Microsoft Teams</em> — Adaptive Card notifications with action buttons.
+      <br>• <em>Kubernetes</em> — pod, node, service, and deployment status via kubectl."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Key point:</strong> "Everything is designed for resilience. If Redis goes down, we fall back to in-memory. If CloudWatch Insights returns empty, we scan log streams directly. If Teams webhook fails, we log it and move on. The system never crashes because of an external dependency."
+    </div>
+
+    <p class="transition">→ Transition: "Let me quickly cover the technology choices, then we'll deep-dive into each feature."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 6 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">6</span> Technology Stack</h2>
+    <span class="time-badge">⏱ 2 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>Don't read the tables — highlight the key decisions:</p>
+
+    <div class="talk-point">
+      <strong>Why FastAPI:</strong> "We chose FastAPI because it gives us async support for WebSocket, automatic OpenAPI docs, and Pydantic validation out of the box. It's one of the fastest Python frameworks."
+    </div>
+
+    <div class="talk-point">
+      <strong>Why Multi-Model LLM:</strong> "We built the LLM service to be model-agnostic. It auto-detects whether you're using Claude, Nova, or Llama and adapts the request format. This means we can switch models without changing any application code — useful for cost optimization or when newer models become available."
+    </div>
+
+    <div class="talk-point">
+      <strong>Why DynamoDB:</strong> "Serverless, scales automatically, pay-per-request. We don't need to manage database servers. Five purpose-built tables with partition key designs optimized for our access patterns."
+    </div>
+
+    <div class="warning">
+      <strong>Tip:</strong> If managers ask about cost, mention: "Bedrock is pay-per-token, DynamoDB is pay-per-request, Redis is the only always-on component. The system is designed to be cost-efficient."
+    </div>
+
+    <p class="transition">→ Transition: "Now let's deep-dive into the features. Starting with PR analysis."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 7 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">7</span> Multi-Agent PR Analysis — Deep Dive</h2>
+    <span class="time-badge">⏱ 5 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <div class="talk-point">
+      <strong>The Pipeline:</strong> "When a developer opens or updates a PR, GitHub sends a webhook to SynapseOps. We verify the signature, deduplicate the event, and spawn a background thread — the webhook returns immediately so GitHub doesn't time out. Then five AI agents run sequentially:"
+    </div>
+
+    <p>Walk through the timeline on the left:</p>
+    <ul>
+      <li><strong>Diff Analyst</strong> — "Looks at what changed. Categorizes modifications, identifies patterns like 'this is a refactor' or 'this touches authentication code'."</li>
+      <li><strong>Code Reviewer</strong> — "Reviews for security vulnerabilities, performance issues, and code style. Think of it as an always-available senior engineer."</li>
+      <li><strong>Summary Generator</strong> — "Creates a human-readable summary and extracts a risk level — Low, Medium, or High."</li>
+      <li><strong>Priority Assessor</strong> — "Considers file count, lines changed, PR type, and all previous agent outputs to assign a priority."</li>
+      <li><strong>Supervisor</strong> — "Consolidates everything into a single, well-formatted PR comment."</li>
+    </ul>
+
+    <div class="talk-point">
+      <strong>What Gets Delivered:</strong> "The result is a comprehensive PR comment, an auto-generated description if the developer left it blank, conflict detection against all other open PRs, a Teams notification with approve/reject buttons, and a full record in DynamoDB for our dashboard."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Impact statement:</strong> "This means every PR gets an instant, consistent, multi-perspective review within 15-30 seconds. It doesn't replace human reviewers — it gives them a head start and ensures nothing slips through."
+    </div>
+
+    <div class="warning">
+      <strong>Anticipate this question:</strong> "Why sequential, not parallel?" — Answer: "To manage Bedrock rate limits and because later agents need outputs from earlier ones. The total time is still under 30 seconds."
+    </div>
+
+    <p class="transition">→ Transition: "What happens when the code passes review but the pipeline fails? That's where auto-healing comes in."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 8 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">8</span> Pipeline Auto-Healing — Deep Dive</h2>
+    <span class="time-badge">⏱ 4 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>Point to the flow diagram at the top:</p>
+
+    <div class="talk-point">
+      <strong>The Flow:</strong> "Pipeline fails → we fetch the build logs from GitHub → AI analyzes the root cause → generates a code fix → opens a PR. Five steps, fully automated, happens in seconds."
+    </div>
+
+    <p>Then explain the error categorization table:</p>
+
+    <div class="talk-point">
+      <strong>Smart Categorization:</strong> "We don't blindly try to fix everything. We categorize errors into 12 types using regex pattern matching. Six of these are auto-fixable — null references, type errors, missing imports, unhandled promises, syntax errors, and env config issues. The other six — memory leaks, database connection issues, auth failures, timeouts, infrastructure problems — these need human judgment, so we only analyze and report."
+    </div>
+
+    <div class="talk-point">
+      <strong>Safety Guardrails:</strong> "The fix only gets committed if the AI's confidence score is 0.8 or higher AND the error category is marked auto-fixable. We're not blindly pushing code — there's a confidence threshold. And the fix goes into a PR, not directly to main, so a human still approves it."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Impact statement:</strong> "This turns a 30-minute developer interruption into a 30-second automated process. The developer comes back to find a fix PR already waiting for their review."
+    </div>
+
+    <p class="transition">→ Transition: "Once code is deployed, we need to make sure production stays healthy. Let me show you our monitoring engine."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 9 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">9</span> Monitoring & Predictive Alerting — Deep Dive</h2>
+    <span class="time-badge">⏱ 5 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+
+    <div class="talk-point">
+      <strong>7 Background Jobs:</strong> "We run seven monitoring jobs on configurable intervals. The error monitor runs every 60 seconds. Slow API detection and anomaly detection run every 5 minutes. SLA checks, recurring error detection, and metric rollups run hourly. And the deployment gate recheck runs every 2 minutes."
+    </div>
+
+    <p>Now focus on the predictive capabilities — this is the most impressive part for managers:</p>
+
+    <div class="talk-point">
+      <strong>Error Trend Prediction:</strong> "This is where it gets interesting. We don't just alert when a threshold is breached — we predict when it <em>will be</em> breached. We fit a linear regression model to the recent error rate history. If the trend line shows we'll hit the threshold within 20 minutes, we fire a warning alert. This gives the team a 20-minute head start to investigate before users are impacted."
+    </div>
+
+    <div class="talk-point">
+      <strong>Traffic Anomaly Detection:</strong> "We use z-score analysis to detect unusual traffic patterns. If current traffic deviates more than 2.5 standard deviations from the baseline — either a spike or a drop — we flag it. A sudden traffic drop could mean a DNS issue or an upstream failure. A spike could mean a DDoS or a viral event."
+    </div>
+
+    <div class="talk-point">
+      <strong>Health Score:</strong> "Every API gets a composite health score from 0 to 100. It's weighted: 40% error rate, 35% latency, 25% throughput. One number that tells you if an API is healthy or not."
+    </div>
+
+    <div class="talk-point">
+      <strong>SLA Tracking:</strong> "We track three SLA metrics per API: error rate, p99 latency, and uptime. Targets are configurable per API. When a violation occurs, it's categorized as warning or critical based on severity."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Impact statement:</strong> "Traditional monitoring tells you something broke. SynapseOps tells you something is <em>about to</em> break — and gives you time to prevent it."
+    </div>
+
+    <p class="transition">→ Transition: "Now, what about deployments? How do we prevent pushing code into a fire?"</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 10 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">10</span> AI Deployment Gate — Deep Dive</h2>
+    <span class="time-badge">⏱ 3 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+
+    <div class="talk-point">
+      <strong>How It Works:</strong> "Every time a build succeeds on main, master, or production branch, the deployment gate activates. It fetches real-time metrics for all monitored APIs — error rates, latency, request volume. Then it sends this data to the LLM and asks: 'Is it safe to deploy right now?' The AI returns a PROCEED or HOLD decision with a confidence score and reasons."
+    </div>
+
+    <div class="talk-point">
+      <strong>When It Holds:</strong> "If the decision is HOLD, the deployment is stored in DynamoDB with full context — why it was held, what the traffic conditions looked like. A Teams notification goes out. And here's the smart part: every 2 minutes, the system rechecks. When conditions improve — error rates drop, latency normalizes — it automatically releases the held deployment and notifies the team."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Impact statement:</strong> "This is like having a senior SRE watching production 24/7 and saying 'wait, don't deploy right now, things are unstable' — except it never sleeps, never misses a signal, and makes the decision in seconds."
+    </div>
+
+    <p class="transition">→ Transition: "Let me show you how the team interacts with all of this — through natural language."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 11 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">11</span> Natural Language Chat — Deep Dive</h2>
+    <span class="time-badge">⏱ 3 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+
+    <div class="talk-point">
+      <strong>The Experience:</strong> "Instead of writing CloudWatch queries or navigating dashboards, anyone on the team can just type a question: 'What are the top errors in the last hour?', 'Is the login API healthy?', 'Show me recent deployments and their impact on error rates'. The system understands 18 different types of questions."
+    </div>
+
+    <div class="talk-point">
+      <strong>3-Stage Classification:</strong> "We use a three-stage intent classification to make sure we understand the question correctly. First, fast keyword matching. Then LLM classification. Then a hard override layer that catches cases where the LLM might be too generic. This gives us very high accuracy in routing questions to the right data source."
+    </div>
+
+    <div class="talk-point">
+      <strong>Data-Grounded:</strong> "The critical thing is that the LLM only answers using actual data we fetch from CloudWatch, DynamoDB, GitHub, or Kubernetes. It never fabricates information. If there's no data, it says 'no data found' instead of making something up."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Impact statement:</strong> "This democratizes infrastructure knowledge. You don't need to be a CloudWatch expert to understand what's happening in production. A product manager can ask 'Is the API healthy?' and get a real answer."
+    </div>
+
+    <p class="transition">→ Transition: "Let me quickly cover the data layer and how we store all of this."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 12 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">12</span> Database & Storage Design</h2>
+    <span class="time-badge">⏱ 2 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>Keep this brief — managers care about the design decisions, not the schema details:</p>
+
+    <div class="talk-point">
+      <strong>Say:</strong> "We use 5 DynamoDB tables, each purpose-built for a specific data type — PR records, pipeline records, alerts, time-series metrics, and audit logs. Plus a sixth table for the deployment gate's held deployments. DynamoDB gives us serverless scaling and pay-per-request pricing."
+    </div>
+
+    <div class="talk-point">
+      <strong>Redis Layer:</strong> "Redis sits in front as a caching layer — rate limiting, deduplication, metric caching, SLA targets. But here's the key design decision: <em>everything works without Redis</em>. If Redis goes down, we fall back to in-memory data structures. The system degrades gracefully, never fails hard."
+    </div>
+
+    <div class="warning">
+      <strong>If asked about data retention:</strong> "DynamoDB data persists indefinitely. The activity log loads the last 24 hours into memory on startup for fast access. Redis caches have TTLs ranging from 2 minutes to 30 days depending on the data type."
+    </div>
+
+    <p class="transition">→ Transition: "Now let's talk about how we keep this system reliable and secure."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 13 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">13</span> Resilience & Security</h2>
+    <span class="time-badge">⏱ 3 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+
+    <div class="talk-point">
+      <strong>Retry Strategy:</strong> "Every external call — GitHub, Bedrock, Teams — uses exponential backoff with jitter. Three retries, increasing delays, with per-service exception handling. If GitHub returns a 502, we wait and retry. If Bedrock throttles us, we back off."
+    </div>
+
+    <div class="talk-point">
+      <strong>Graceful Degradation:</strong> "This is a core design principle. I want to emphasize this: <em>no single external dependency can bring down SynapseOps</em>. Redis down? In-memory fallback. DynamoDB down? Activity log works in memory. CloudWatch returns empty? We scan log streams directly. Teams webhook fails? We log it and continue. kubectl not installed? Empty results, no crash."
+    </div>
+
+    <div class="talk-point">
+      <strong>Security:</strong> "Webhooks are verified with HMAC SHA-256. The Docker container runs as a non-root user. All inputs are validated with Pydantic — message length limits, API count limits, query parameter bounds. Chat has rate limiting via an atomic Redis Lua script."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Impact statement:</strong> "We built this to be production-grade from day one. It's not a prototype — it's designed to run 24/7 without babysitting."
+    </div>
+
+    <p class="transition">→ Transition: "Let me show you how it's deployed."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 14 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">14</span> Deployment Architecture</h2>
+    <span class="time-badge">⏱ 2 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+
+    <div class="talk-point">
+      <strong>Say:</strong> "SynapseOps runs as a Docker container on Amazon EKS, deployed via Helm charts. The container is lightweight — python:3.11-slim base, non-root user, built-in health checks. Kubernetes handles liveness and readiness probes. AWS access is via IRSA — IAM Roles for Service Accounts — so no credentials are stored in the container."
+    </div>
+
+    <div class="talk-point">
+      <strong>Resource Footprint:</strong> "It runs on 256m to 512m CPU and 512Mi to 1Gi memory. It's not resource-hungry. The heavy lifting is done by Bedrock and DynamoDB — both serverless."
+    </div>
+
+    <div class="warning">
+      <strong>If asked about scaling:</strong> "Currently single replica. The stateless design means we can scale horizontally — Redis handles shared state for deduplication across replicas. The main consideration for scaling would be Bedrock rate limits."
+    </div>
+
+    <p class="transition">→ Transition: "Let me cover how the team stays informed in real-time."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 15 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">15</span> Real-Time Updates & Notifications</h2>
+    <span class="time-badge">⏱ 2 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+
+    <div class="talk-point">
+      <strong>WebSocket:</strong> "Three WebSocket channels keep the dashboard live — activity feed, chat streaming, and notifications. No polling. When an agent finishes analyzing a PR, the dashboard updates instantly."
+    </div>
+
+    <div class="talk-point">
+      <strong>Teams Integration:</strong> "Every critical event sends an Adaptive Card to Teams. PR reviews come with Approve and Reject buttons — the reviewer can act directly from Teams without opening GitHub. Pipeline failures, monitoring alerts, deployment gate decisions — all show up in Teams with rich formatting and action buttons."
+    </div>
+
+    <div class="key-phrase">
+      <strong>Impact statement:</strong> "The team never has to go looking for information. Information comes to them — in the dashboard, in Teams, in real-time."
+    </div>
+
+    <p class="transition">→ Transition: "Let me tie it all together with the end-to-end workflow."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 16 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">16</span> End-to-End Workflow</h2>
+    <span class="time-badge">⏱ 3 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+    <p>This is the story slide. Walk through the timeline like you're narrating a developer's day:</p>
+
+    <div class="talk-point">
+      <strong>Tell the story:</strong> "Let me walk you through a real scenario. A developer opens a PR in the morning. Within 30 seconds, SynapseOps has analyzed the code with 5 AI agents, posted a review comment, detected a potential conflict with another team's PR, and sent a Teams notification to the reviewer with approve/reject buttons.
+
+      <br><br>The reviewer approves from Teams. The CI/CD pipeline runs. Let's say it fails — a missing import. SynapseOps catches it, analyzes the logs, generates a fix, and opens a fix PR. The developer merges the fix, pipeline passes.
+
+      <br><br>Now the build is ready to deploy to production. But SynapseOps checks the deployment gate first — error rates are slightly elevated from an earlier incident. It holds the deployment and notifies the team. Two minutes later, the monitoring jobs confirm error rates have normalized. The gate auto-releases, deployment proceeds.
+
+      <br><br>Meanwhile, the monitoring engine is running in the background. It detects that the login API's error rate is trending upward. Linear regression predicts it'll breach the threshold in 15 minutes. An alert fires. The on-call engineer asks the chat: 'What's happening with the login API?' and gets a data-grounded answer with error breakdown and deployment correlation.
+
+      <br><br>That's the full cycle — from code to production, with AI at every step."
+    </div>
+
+    <div class="key-phrase">
+      <strong>This is your strongest slide.</strong> The story makes everything concrete. Take your time here. Let the audience visualize the workflow.
+    </div>
+
+    <p class="transition">→ Transition: "Let me wrap up with the key takeaways."</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 17 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section">
+  <div class="slide-header">
+    <h2><span class="slide-num">17</span> Summary & Closing</h2>
+    <span class="time-badge">⏱ 3 minutes</span>
+  </div>
+  <div class="slide-body">
+    <h3>🎤 What to Say</h3>
+
+    <div class="talk-point">
+      <strong>Three Takeaways:</strong>
+      <br><br>"If you remember three things from this presentation:
+      <br><br><strong>1. Faster Response</strong> — What used to take hours of manual investigation now takes seconds. AI analyzes, diagnoses, and in many cases fixes the problem before a human even looks at it.
+      <br><br><strong>2. Safer Deployments</strong> — We no longer deploy blind. The AI deployment gate ensures we never push code into a degraded environment. And it auto-releases when it's safe.
+      <br><br><strong>3. Proactive, Not Reactive</strong> — Predictive alerting means we know about problems before users do. We've shifted from firefighting to fire prevention."
+    </div>
+
+    <p>Point to the bottom stats:</p>
+    <div class="talk-point">
+      <strong>The Numbers:</strong> "6 AI agents on every PR. 12 error categories auto-classified. 24/7 continuous monitoring. And the goal: zero human intervention required for routine DevOps tasks."
+    </div>
+
+    <div class="talk-point">
+      <strong>Close:</strong> "SynapseOps is not replacing engineers — it's giving them superpowers. It handles the repetitive, time-consuming work so the team can focus on building features and solving hard problems. Thank you. I'm happy to take questions."
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- Q&A PREPARATION -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="qa-section">
+  <h2>🙋 Anticipated Q&A — 15 Minutes</h2>
+
+  <div class="qa-item">
+    <div class="q">Q: How much does this cost to run?</div>
+    <div class="a">Bedrock is pay-per-token — each PR analysis costs roughly a few cents. DynamoDB is pay-per-request. Redis is the only always-on cost. The EKS pod uses minimal resources (256m CPU, 512Mi RAM). Total monthly cost is very low compared to the engineering time it saves.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: What if the AI generates a wrong fix?</div>
+    <div class="a">Two safety nets: First, auto-fix only triggers for 6 specific error categories with a confidence threshold of 0.8 or higher. Second, the fix goes into a PR — it never pushes directly to main. A human always reviews and approves the fix before it's merged.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: Can this work with our existing repos/services?</div>
+    <div class="a">Yes. Configuration is entirely via environment variables. You point it at your GitHub repo, your CloudWatch log group, and your monitored API paths. No code changes needed in your application. It's purely observational — it reads logs and GitHub events.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: What happens if Bedrock/AWS goes down?</div>
+    <div class="a">Graceful degradation is a core design principle. If Bedrock is unavailable, AI features pause but the monitoring dashboard, activity log, and webhook processing continue. If DynamoDB is down, the activity log works in-memory. If Redis is down, we fall back to in-memory dedup and rate limiting. No single dependency can crash the system.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: How accurate is the PR risk assessment?</div>
+    <div class="a">The risk assessment considers multiple signals: number of files changed, lines added/deleted, which parts of the codebase are touched (auth, config, etc.), and the code review findings. It's not perfect — it's a first-pass triage. The value is consistency: every PR gets the same level of scrutiny, and high-risk changes are flagged immediately.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: Can we customize the monitoring thresholds?</div>
+    <div class="a">Everything is configurable via environment variables: error rate threshold, slow API threshold, monitoring intervals, alert cooldown, SLA targets per API, chat rate limits. SLA targets can even be set per-API via the REST API.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: How does this compare to tools like Datadog or PagerDuty?</div>
+    <div class="a">Those are excellent monitoring and alerting tools. SynapseOps is different — it doesn't just monitor and alert, it <em>acts</em>. It reviews PRs, fixes pipelines, gates deployments, and answers questions. Think of it as an AI DevOps engineer that uses monitoring data to make decisions and take action. It could complement existing tools, not replace them.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: What's the deployment gate's false positive rate?</div>
+    <div class="a">The gate errs on the side of caution — it's better to hold a deployment for 2 minutes than to deploy into a degraded environment. Held deployments are rechecked every 120 seconds and auto-released when conditions improve. In practice, most holds resolve within one or two recheck cycles.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: Can we switch LLM models easily?</div>
+    <div class="a">Yes, it's a single environment variable change. The LLM service auto-detects the model family (Anthropic, Nova, Meta) and adapts the request format. No code changes needed. This is useful for cost optimization or testing newer models.</div>
+  </div>
+
+  <div class="qa-item">
+    <div class="q">Q: What's the roadmap / what's next?</div>
+    <div class="a">Potential areas: parallel agent execution for faster PR analysis, more auto-fix categories, Slack integration alongside Teams, custom alert rules via UI, and integration with more CI/CD platforms beyond GitHub Actions.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TIMING SUMMARY -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide-section" style="border:2px solid var(--primary)">
+  <div class="slide-header" style="background:var(--blue-bg)">
+    <h2 style="gap:8px">⏱ Timing Summary</h2>
+    <span class="time-badge">Total: 60 min</span>
+  </div>
+  <div class="slide-body">
+    <table>
+      <thead><tr><th>Slide</th><th>Topic</th><th>Time</th><th>Cumulative</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Title</td><td>1 min</td><td>1 min</td></tr>
+        <tr><td>2</td><td>The Problem</td><td>4 min</td><td>5 min</td></tr>
+        <tr><td>3</td><td>Solution Overview</td><td>3 min</td><td>8 min</td></tr>
+        <tr><td>4</td><td>Six Pillars</td><td>5 min</td><td>13 min</td></tr>
+        <tr><td>5</td><td>Architecture</td><td>4 min</td><td>17 min</td></tr>
+        <tr><td>6</td><td>Tech Stack</td><td>2 min</td><td>19 min</td></tr>
+        <tr><td>7</td><td>PR Analysis Deep Dive</td><td>5 min</td><td>24 min</td></tr>
+        <tr><td>8</td><td>Auto-Healing Deep Dive</td><td>4 min</td><td>28 min</td></tr>
+        <tr><td>9</td><td>Monitoring & Alerting</td><td>5 min</td><td>33 min</td></tr>
+        <tr><td>10</td><td>Deployment Gate</td><td>3 min</td><td>36 min</td></tr>
+        <tr><td>11</td><td>Chat Interface</td><td>3 min</td><td>39 min</td></tr>
+        <tr><td>12</td><td>Database & Storage</td><td>2 min</td><td>41 min</td></tr>
+        <tr><td>13</td><td>Resilience & Security</td><td>3 min</td><td>44 min</td></tr>
+        <tr><td>14</td><td>Deployment Architecture</td><td>2 min</td><td>46 min</td></tr>
+        <tr><td>15</td><td>Real-Time & Notifications</td><td>2 min</td><td>48 min</td></tr>
+        <tr><td>16</td><td>End-to-End Workflow</td><td>3 min</td><td>51 min</td></tr>
+        <tr><td>17</td><td>Summary & Closing</td><td>3 min</td><td>54 min</td></tr>
+        <tr style="background:var(--blue-bg);font-weight:700"><td></td><td>Q&A</td><td>~6 min</td><td>60 min</td></tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top:20px;padding:16px;background:var(--green-bg);border-radius:10px;border-left:3px solid var(--green)">
+      <strong style="color:#059669">Pro Tips:</strong>
+      <ul style="margin:8px 0 0 20px;font-size:0.92em">
+        <li>If running short on time, compress slides 12-15 (data, resilience, deployment, notifications) into 4 minutes total — just hit the key points.</li>
+        <li>If running long, skip slide 6 (tech stack) entirely — it's reference material.</li>
+        <li>Slide 16 (end-to-end workflow) is your strongest moment. Don't rush it.</li>
+        <li>Keep a glass of water handy. The deep dive slides (7-9) are the most talking-intensive.</li>
+        <li>If managers start asking questions mid-presentation, answer briefly and say "I'll cover that in detail on slide X" to stay on track.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

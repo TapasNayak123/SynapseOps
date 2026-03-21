@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SynapseOps — AI-Powered DevOps Platform</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#4361ee;--primary-dark:#3a0ca3;--accent:#7209b7;
+  --success:#06d6a0;--warning:#ffd166;--danger:#ef476f;
+  --bg:#0f0f1a;--card:#1a1a2e;--card2:#16213e;--text:#e0e0e0;
+  --text-muted:#8892b0;--white:#ffffff;
+  --gradient:linear-gradient(135deg,#4361ee,#7209b7);
+  --gradient2:linear-gradient(135deg,#06d6a0,#4361ee);
+}
+body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+
+/* ── SLIDE SYSTEM ── */
+.slide{min-height:100vh;padding:60px 80px;display:flex;flex-direction:column;justify-content:center;position:relative;border-bottom:1px solid rgba(255,255,255,0.04)}
+.slide::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 20% 50%,rgba(67,97,238,0.05) 0%,transparent 60%);pointer-events:none}
+.slide-number{position:absolute;bottom:24px;right:40px;color:var(--text-muted);font-size:0.85em;opacity:0.5}
+
+/* ── TITLE SLIDE ── */
+.title-slide{text-align:center;background:linear-gradient(160deg,#0a0a15 0%,#1a1a2e 40%,#16213e 100%)}
+.title-slide h1{font-size:4.5em;font-weight:800;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px;letter-spacing:-1.5px}
+.title-slide .subtitle{font-size:1.45em;color:var(--text-muted);font-weight:300;margin-bottom:40px}
+.title-slide .tagline{font-size:1.05em;color:var(--primary);font-weight:600;letter-spacing:3px;text-transform:uppercase;margin-bottom:48px}
+.title-slide .meta{color:var(--text-muted);font-size:0.95em;line-height:2}
+.logo-icon{font-size:4.5em;margin-bottom:20px;display:block}
+
+/* ── SECTION HEADERS ── */
+.section-label{font-size:0.8em;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--primary);margin-bottom:12px}
+.slide h2{font-size:2.6em;font-weight:700;color:var(--white);margin-bottom:32px;line-height:1.2}
+.slide h2 span{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.slide h3{font-size:1.4em;font-weight:600;color:var(--white);margin:28px 0 16px}
+
+/* ── CARDS ── */
+.card-grid{display:grid;gap:24px;margin:24px 0}
+.card-grid.cols-2{grid-template-columns:1fr 1fr}
+.card-grid.cols-3{grid-template-columns:1fr 1fr 1fr}
+.card-grid.cols-4{grid-template-columns:1fr 1fr 1fr 1fr}
+.card{background:var(--card);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:28px 24px;transition:transform 0.2s}
+.card:hover{transform:translateY(-2px)}
+.card .icon{font-size:2.2em;margin-bottom:14px;display:block}
+.card .card-title{font-size:1.1em;font-weight:700;color:var(--white);margin-bottom:8px}
+.card .card-text{font-size:0.92em;color:var(--text-muted);line-height:1.65}
+.card-accent{border-left:3px solid var(--primary)}
+.card-success{border-left:3px solid var(--success)}
+.card-warning{border-left:3px solid var(--warning)}
+.card-danger{border-left:3px solid var(--danger)}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin:32px 0}
+.stat{background:var(--card);border-radius:14px;padding:24px;text-align:center;border:1px solid rgba(255,255,255,0.06)}
+.stat .number{font-size:2.8em;font-weight:800;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat .label{font-size:0.85em;color:var(--text-muted);margin-top:6px;font-weight:500}
+
+/* ── FLOW DIAGRAMS ── */
+.flow{display:flex;align-items:center;gap:12px;margin:20px 0;flex-wrap:wrap}
+.flow-step{background:var(--card);border:1px solid rgba(67,97,238,0.3);border-radius:12px;padding:14px 20px;font-size:0.9em;font-weight:600;color:var(--white);text-align:center;min-width:120px}
+.flow-step.highlight{background:linear-gradient(135deg,rgba(67,97,238,0.2),rgba(114,9,183,0.2));border-color:var(--primary)}
+.flow-arrow{color:var(--primary);font-size:1.4em;font-weight:bold}
+
+/* ── TABLES ── */
+table{width:100%;border-collapse:collapse;margin:20px 0;font-size:0.9em}
+thead{background:rgba(67,97,238,0.15)}
+th{padding:14px 18px;text-align:left;font-weight:600;color:var(--primary);font-size:0.85em;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid rgba(67,97,238,0.3)}
+td{padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text)}
+tbody tr:hover{background:rgba(67,97,238,0.05)}
+
+/* ── ARCHITECTURE BOX ── */
+.arch-box{background:var(--card);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:32px;margin:24px 0}
+.arch-box pre{background:#0d0d1a;color:#cdd6f4;padding:24px;border-radius:10px;font-family:'Cascadia Code','Fira Code',Consolas,monospace;font-size:0.78em;line-height:1.6;overflow-x:auto;margin:0}
+
+/* ── TAGS ── */
+.tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.78em;font-weight:600;margin:2px 4px}
+.tag-blue{background:rgba(67,97,238,0.15);color:#7b9ef8}
+.tag-green{background:rgba(6,214,160,0.15);color:#06d6a0}
+.tag-purple{background:rgba(114,9,183,0.15);color:#b57edc}
+.tag-orange{background:rgba(255,209,102,0.15);color:#ffd166}
+.tag-red{background:rgba(239,71,111,0.15);color:#ef476f}
+
+/* ── TIMELINE ── */
+.timeline{position:relative;padding-left:32px;margin:24px 0}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--primary),var(--accent))}
+.timeline-item{position:relative;margin-bottom:24px;padding-left:24px}
+.timeline-item::before{content:'';position:absolute;left:-28px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--primary);border:3px solid var(--bg)}
+.timeline-item .tl-title{font-weight:700;color:var(--white);font-size:1em;margin-bottom:4px}
+.timeline-item .tl-text{color:var(--text-muted);font-size:0.9em;line-height:1.6}
+
+/* ── LISTS ── */
+.feature-list{list-style:none;margin:16px 0}
+.feature-list li{padding:10px 0 10px 32px;position:relative;font-size:0.95em;color:var(--text);border-bottom:1px solid rgba(255,255,255,0.03)}
+.feature-list li::before{content:'▸';position:absolute;left:8px;color:var(--primary);font-weight:bold;font-size:1.1em}
+
+/* ── TWO COLUMN ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
+
+/* ── HIGHLIGHT BOX ── */
+.highlight-box{background:linear-gradient(135deg,rgba(67,97,238,0.08),rgba(114,9,183,0.08));border:1px solid rgba(67,97,238,0.2);border-radius:14px;padding:24px 28px;margin:20px 0}
+.highlight-box p{margin:0;color:var(--text);font-size:0.95em;line-height:1.7}
+
+/* ── BADGE ROW ── */
+.badge-row{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.badge{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 18px;font-size:0.88em;font-weight:500}
+.badge .b-icon{font-size:1.3em}
+
+/* ── PRINT ── */
+@media print{
+  body{background:#fff;color:#1a1a2e}
+  .slide{min-height:auto;page-break-after:always;padding:40px;border:none}
+  .card,.stat,.arch-box{border-color:#ddd;background:#f8f9fc}
+  .slide h2,.card-title,.stat .number{color:#1a1a2e;-webkit-text-fill-color:#1a1a2e}
+  pre{background:#f0f0f0 !important;color:#1a1a2e !important}
+}
+@media(max-width:900px){
+  .slide{padding:32px 24px}
+  .card-grid.cols-3,.card-grid.cols-4{grid-template-columns:1fr 1fr}
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .two-col{grid-template-columns:1fr}
+  .title-slide h1{font-size:2.8em}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1: TITLE -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide title-slide">
+  <div>
+    <span class="logo-icon">⚡</span>
+    <h1>SynapseOps</h1>
+    <div class="subtitle">AI-Powered DevOps Monitoring &amp; Auto-Remediation Platform</div>
+    <div class="tagline">Intelligent Observability · Automated Healing · Zero Downtime</div>
+    <div style="max-width:700px;margin:28px auto 36px;padding:18px 28px;background:rgba(67,97,238,0.08);border:1px solid rgba(67,97,238,0.2);border-radius:12px;text-align:center">
+      <p style="font-size:0.95em;color:var(--text-muted);line-height:1.7;margin:0">
+        <strong style="color:var(--white)">Synapse</strong> <span style="color:var(--text-muted)">(n.)</span> — the junction between nerve cells where signals are transmitted, triggering rapid, intelligent responses.<br>
+        <strong style="color:var(--white)">SynapseOps</strong> is the nervous system of your DevOps workflow — connecting every signal to an autonomous action.
+      </p>
+    </div>
+    <div class="meta">
+      Engineering Team Presentation &nbsp;·&nbsp; March 2026
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2: THE PROBLEM -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">The Challenge</div>
+  <h2>Why We Built <span>SynapseOps</span></h2>
+
+  <div class="card-grid cols-2">
+    <div class="card card-danger">
+      <span class="icon">🔥</span>
+      <div class="card-title">Manual Incident Response</div>
+      <div class="card-text">Engineers spend hours diagnosing production issues — reading logs, correlating events, and identifying root causes manually. Mean Time to Resolution (MTTR) stays high.</div>
+    </div>
+    <div class="card card-warning">
+      <span class="icon">⏳</span>
+      <div class="card-title">Slow Code Review Cycles</div>
+      <div class="card-text">Pull requests sit in queues waiting for human reviewers. No consistent risk assessment. Critical changes sometimes slip through without proper scrutiny.</div>
+    </div>
+    <div class="card card-danger">
+      <span class="icon">💀</span>
+      <div class="card-title">Pipeline Failures Block Teams</div>
+      <div class="card-text">CI/CD failures require manual investigation. Developers context-switch to debug build issues, losing productive development time.</div>
+    </div>
+    <div class="card card-warning">
+      <span class="icon">🎯</span>
+      <div class="card-title">Risky Deployments</div>
+      <div class="card-text">Deployments happen without awareness of current production health. No automated gate to prevent deploying into an already degraded environment.</div>
+    </div>
+  </div>
+
+  <div class="highlight-box" style="margin-top:32px">
+    <p><strong style="color:var(--white)">The Core Problem:</strong> DevOps teams are reactive instead of proactive. By the time issues are detected, users are already impacted. We needed an intelligent system that monitors, analyzes, and acts — autonomously.</p>
+  </div>
+  <span class="slide-number">2</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3: SOLUTION OVERVIEW -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Our Solution</div>
+  <h2>What is <span>SynapseOps</span>?</h2>
+
+  <p style="font-size:1.15em;color:var(--text);max-width:800px;margin-bottom:36px;line-height:1.8">
+    SynapseOps is an <strong style="color:var(--white)">AI-powered DevOps platform</strong> that continuously monitors your production APIs, reviews every pull request with multi-agent AI, auto-heals pipeline failures, and gates deployments based on real-time traffic health — all with <strong style="color:var(--success)">zero human intervention</strong>.
+  </p>
+
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="number">6</div>
+      <div class="label">AI Agents</div>
+    </div>
+    <div class="stat">
+      <div class="number">18</div>
+      <div class="label">Chat Intents</div>
+    </div>
+    <div class="stat">
+      <div class="number">7</div>
+      <div class="label">Monitoring Jobs</div>
+    </div>
+    <div class="stat">
+      <div class="number">40+</div>
+      <div class="label">API Endpoints</div>
+    </div>
+  </div>
+
+  <div class="badge-row" style="margin-top:28px">
+    <div class="badge"><span class="b-icon">🤖</span> Multi-Agent PR Review</div>
+    <div class="badge"><span class="b-icon">🔧</span> Auto-Healing Pipelines</div>
+    <div class="badge"><span class="b-icon">📊</span> Real-Time API Monitoring</div>
+    <div class="badge"><span class="b-icon">🚦</span> AI Deployment Gate</div>
+    <div class="badge"><span class="b-icon">💬</span> Natural Language Chat</div>
+    <div class="badge"><span class="b-icon">🔔</span> Teams Notifications</div>
+    <div class="badge"><span class="b-icon">📈</span> Anomaly Detection</div>
+    <div class="badge"><span class="b-icon">⚡</span> WebSocket Real-Time</div>
+  </div>
+  <span class="slide-number">3</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4: KEY CAPABILITIES -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Platform Capabilities</div>
+  <h2>Six Pillars of <span>Intelligent DevOps</span></h2>
+
+  <div class="card-grid cols-3">
+    <div class="card card-accent">
+      <span class="icon">🤖</span>
+      <div class="card-title">Multi-Agent PR Analysis</div>
+      <div class="card-text">
+        5 specialized AI agents analyze every PR: diff analysis, code review, summary generation, risk assessment, and a supervisor that consolidates everything into a single actionable review comment.
+      </div>
+      <div style="margin-top:12px">
+        <span class="tag tag-blue">Auto-Description</span>
+        <span class="tag tag-red">Risk Scoring</span>
+        <span class="tag tag-purple">Conflict Detection</span>
+      </div>
+    </div>
+
+    <div class="card card-success">
+      <span class="icon">🔧</span>
+      <div class="card-title">Pipeline Auto-Healing</div>
+      <div class="card-text">
+        Detects CI/CD failures in real-time, performs AI root cause analysis on build logs, generates code fixes, and automatically opens fix PRs — all within seconds of failure.
+      </div>
+      <div style="margin-top:12px">
+        <span class="tag tag-green">12 Error Categories</span>
+        <span class="tag tag-blue">Auto-Fix PRs</span>
+        <span class="tag tag-orange">Confidence Scoring</span>
+      </div>
+    </div>
+
+    <div class="card card-accent">
+      <span class="icon">📊</span>
+      <div class="card-title">Real-Time API Monitoring</div>
+      <div class="card-text">
+        Continuously monitors production APIs via CloudWatch Logs. Tracks error rates, latency percentiles (p50/p95/p99), request volumes, and generates composite health scores.
+      </div>
+      <div style="margin-top:12px">
+        <span class="tag tag-blue">CloudWatch Insights</span>
+        <span class="tag tag-green">Health Scores</span>
+        <span class="tag tag-red">Threshold Alerts</span>
+      </div>
+    </div>
+
+    <div class="card card-warning">
+      <span class="icon">🚦</span>
+      <div class="card-title">AI Deployment Gate</div>
+      <div class="card-text">
+        Evaluates production health before every deployment. AI decides whether to proceed or hold based on live error rates, latency, and traffic patterns. Auto-releases when conditions improve.
+      </div>
+      <div style="margin-top:12px">
+        <span class="tag tag-orange">PROCEED / HOLD</span>
+        <span class="tag tag-green">Auto-Release</span>
+        <span class="tag tag-purple">120s Recheck</span>
+      </div>
+    </div>
+
+    <div class="card card-accent">
+      <span class="icon">📈</span>
+      <div class="card-title">Predictive Analytics</div>
+      <div class="card-text">
+        Z-score anomaly detection for traffic spikes/drops. Linear regression predicts error threshold breaches up to 20 minutes in advance. SLA compliance tracking with configurable targets.
+      </div>
+      <div style="margin-top:12px">
+        <span class="tag tag-blue">Z-Score</span>
+        <span class="tag tag-purple">Linear Regression</span>
+        <span class="tag tag-green">SLA Tracking</span>
+      </div>
+    </div>
+
+    <div class="card card-success">
+      <span class="icon">💬</span>
+      <div class="card-title">Natural Language Chat</div>
+      <div class="card-text">
+        Ask questions in plain English: "What are the top errors today?", "Show me slow APIs", "Check SLA compliance". 18 intents covering monitoring, infrastructure, and CI/CD queries.
+      </div>
+      <div style="margin-top:12px">
+        <span class="tag tag-green">18 Intents</span>
+        <span class="tag tag-blue">3-Stage Classification</span>
+        <span class="tag tag-purple">Data-Grounded</span>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">4</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5: ARCHITECTURE -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">System Design</div>
+  <h2>Platform <span>Architecture</span></h2>
+
+  <div class="arch-box">
+<pre>
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          BROWSER (UI Layer)                             │
+│   Dashboard  ·  Pipelines  ·  Metrics  ·  Activity  ·  PR Detail      │
+│   Chat Widget (all pages)  ──  WebSocket  ──  Real-Time Notifications  │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │  HTTP / WebSocket
+┌──────────────────────────────────┼──────────────────────────────────────┐
+│                    FastAPI Application (Port 5000)                      │
+│                                                                         │
+│   ┌─────────────┐    ┌──────────────────┐    ┌───────────────────┐     │
+│   │   Routes    │    │    Services      │    │   Background      │     │
+│   │             │    │                  │    │                   │     │
+│   │  /webhook   │    │  ChatEngine      │    │  APScheduler      │     │
+│   │  /api/chat  │    │  CloudWatch      │    │  (7 monitoring    │     │
+│   │  /api/metr* │    │  LLM (Bedrock)   │    │   jobs)           │     │
+│   │  /api/alert*│    │  ErrorAnalyzer   │    │                   │     │
+│   │  /ws/*      │    │  AnomalyDetect   │    │  Webhook Handlers │     │
+│   │  /dashboard │    │  SLATracker      │    │  (daemon threads) │     │
+│   │  /action/*  │    │  DeploymentGate  │    │                   │     │
+│   │             │    │  AutoFixService  │    │                   │     │
+│   │             │    │  K8sClient       │    │                   │     │
+│   └──────┬──────┘    └────────┬─────────┘    └─────────┬─────────┘     │
+│          └────────────────────┼─────────────────────────┘               │
+│                               │                                         │
+│   ┌───────────────────────────┴───────────────────────────────────┐     │
+│   │                     External Services                         │     │
+│   │                                                               │     │
+│   │   Amazon Bedrock    Amazon DynamoDB    Amazon CloudWatch      │     │
+│   │   (Claude/Nova/     (5 tables)        Logs Insights          │     │
+│   │    Llama)                                                     │     │
+│   │                                                               │     │
+│   │   Redis             GitHub API         Microsoft Teams        │     │
+│   │   (Cache/Dedup)     (REST)             (Adaptive Cards)      │     │
+│   │                                                               │     │
+│   │   Kubernetes (kubectl)                                        │     │
+│   └───────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────┘
+</pre>
+  </div>
+  <span class="slide-number">5</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6: TECHNOLOGY STACK -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Technology</div>
+  <h2>Technology <span>Stack</span></h2>
+
+  <div class="two-col">
+    <div>
+      <h3>Core Platform</h3>
+      <table>
+        <thead><tr><th>Layer</th><th>Technology</th></tr></thead>
+        <tbody>
+          <tr><td>Runtime</td><td>Python 3.11</td></tr>
+          <tr><td>Framework</td><td>FastAPI + Uvicorn (async)</td></tr>
+          <tr><td>AI / LLM</td><td>Amazon Bedrock (Claude 3 Haiku, Nova, Llama)</td></tr>
+          <tr><td>Database</td><td>Amazon DynamoDB (5 tables)</td></tr>
+          <tr><td>Log Analysis</td><td>Amazon CloudWatch Logs Insights</td></tr>
+          <tr><td>Cache</td><td>Redis (with graceful degradation)</td></tr>
+          <tr><td>Real-Time</td><td>WebSocket (3 channels)</td></tr>
+          <tr><td>Notifications</td><td>Microsoft Teams (Adaptive Cards v1.4)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>Infrastructure &amp; Deployment</h3>
+      <table>
+        <thead><tr><th>Layer</th><th>Technology</th></tr></thead>
+        <tbody>
+          <tr><td>Container</td><td>Docker (python:3.11-slim, non-root)</td></tr>
+          <tr><td>Orchestration</td><td>Amazon EKS + Helm Charts</td></tr>
+          <tr><td>CI/CD</td><td>GitHub Actions</td></tr>
+          <tr><td>IAM</td><td>IRSA (IAM Roles for Service Accounts)</td></tr>
+          <tr><td>Registry</td><td>Amazon ECR</td></tr>
+          <tr><td>Logging</td><td>structlog (JSON structured)</td></tr>
+          <tr><td>Kubernetes</td><td>kubectl (pod/node/service status)</td></tr>
+          <tr><td>HTTP Clients</td><td>httpx + requests (connection pooled)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="highlight-box" style="margin-top:32px">
+    <p><strong style="color:var(--white)">Multi-Model LLM Support:</strong> SynapseOps supports Anthropic Claude, Amazon Nova, and Meta Llama models via Bedrock. The LLM service auto-detects the model family and adapts the request/response format accordingly — making it easy to switch models without code changes.</p>
+  </div>
+  <span class="slide-number">6</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 7: PR ANALYSIS PIPELINE -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Feature Deep Dive</div>
+  <h2>Multi-Agent <span>PR Analysis</span></h2>
+
+  <div class="two-col">
+    <div>
+      <p style="font-size:1.05em;line-height:1.8;margin-bottom:24px">
+        Every pull request triggers a <strong style="color:var(--white)">5-agent AI pipeline</strong> that analyzes code changes from multiple perspectives, then a supervisor agent consolidates everything into a single comprehensive review.
+      </p>
+
+      <div class="flow" style="flex-direction:column;align-items:stretch;gap:0">
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="tl-title">① Diff Analyst</div>
+            <div class="tl-text">Analyzes code changes, categorizes modifications, identifies patterns</div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-title">② Code Reviewer</div>
+            <div class="tl-text">Security vulnerabilities, performance issues, code style</div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-title">③ Summary Generator</div>
+            <div class="tl-text">Human-readable summary with risk level extraction</div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-title">④ Priority Assessor</div>
+            <div class="tl-text">Risk scoring (Low/Medium/High) based on all signals</div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-title">⑤ Supervisor Agent</div>
+            <div class="tl-text">Consolidates all outputs → single PR comment</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3>What Gets Delivered</h3>
+      <div class="card-grid" style="grid-template-columns:1fr;gap:14px">
+        <div class="card card-accent" style="padding:16px 20px">
+          <div class="card-title" style="font-size:0.95em">📝 PR Comment</div>
+          <div class="card-text">Consolidated review with risk level, summary, and actionable feedback</div>
+        </div>
+        <div class="card card-success" style="padding:16px 20px">
+          <div class="card-title" style="font-size:0.95em">📋 Auto-Description</div>
+          <div class="card-text">Generates PR description if body is empty or too short (&lt;50 chars)</div>
+        </div>
+        <div class="card card-warning" style="padding:16px 20px">
+          <div class="card-title" style="font-size:0.95em">⚠️ Conflict Detection</div>
+          <div class="card-text">Checks for file-level conflicts with all other open PRs</div>
+        </div>
+        <div class="card card-accent" style="padding:16px 20px">
+          <div class="card-title" style="font-size:0.95em">🔔 Teams Notification</div>
+          <div class="card-text">Adaptive Card with Approve &amp; Reject buttons for one-click action</div>
+        </div>
+        <div class="card card-success" style="padding:16px 20px">
+          <div class="card-title" style="font-size:0.95em">💾 DynamoDB Record</div>
+          <div class="card-text">Full analysis stored for dashboard, metrics, and historical tracking</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">7</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 8: PIPELINE AUTO-HEALING -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Feature Deep Dive</div>
+  <h2>Pipeline <span>Auto-Healing</span></h2>
+
+  <p style="font-size:1.05em;line-height:1.8;margin-bottom:28px;max-width:850px">
+    When a CI/CD pipeline fails, SynapseOps automatically fetches the build logs, performs AI root cause analysis, generates a code fix, and opens a pull request — <strong style="color:var(--success)">all within seconds</strong>.
+  </p>
+
+  <div class="flow" style="justify-content:center;margin:32px 0">
+    <div class="flow-step">🔴 Pipeline Fails</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step">📋 Fetch Logs</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step highlight">🤖 AI Analysis</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step highlight">🔧 Generate Fix</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" style="border-color:var(--success)">✅ Open Fix PR</div>
+  </div>
+
+  <div class="two-col" style="margin-top:32px">
+    <div>
+      <h3>Error Categorization (12 Types)</h3>
+      <table>
+        <thead><tr><th>Category</th><th>Auto-Fixable</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td>Null Reference</td><td><span class="tag tag-green">Yes</span></td><td>Cannot read property of undefined</td></tr>
+          <tr><td>Type Error</td><td><span class="tag tag-green">Yes</span></td><td>is not a function</td></tr>
+          <tr><td>Missing Import</td><td><span class="tag tag-green">Yes</span></td><td>Cannot find module</td></tr>
+          <tr><td>Unhandled Promise</td><td><span class="tag tag-green">Yes</span></td><td>UnhandledPromiseRejection</td></tr>
+          <tr><td>Syntax Error</td><td><span class="tag tag-green">Yes</span></td><td>JSON.parse failure</td></tr>
+          <tr><td>Env Config</td><td><span class="tag tag-green">Yes</span></td><td>Missing env variable</td></tr>
+          <tr><td>Memory Leak</td><td><span class="tag tag-red">No</span></td><td>Out of memory / ENOMEM</td></tr>
+          <tr><td>DB Connection</td><td><span class="tag tag-red">No</span></td><td>ECONNREFUSED + database</td></tr>
+          <tr><td>Auth Failure</td><td><span class="tag tag-red">No</span></td><td>401/403 / token expired</td></tr>
+          <tr><td>Infrastructure</td><td><span class="tag tag-red">No</span></td><td>OOMKilled / CrashLoopBackOff</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>How Auto-Fix Works</h3>
+      <div class="card card-success" style="margin-bottom:16px">
+        <div class="card-title">1. Categorize &amp; Parse</div>
+        <div class="card-text">Regex-based error categorization + stack trace parsing to identify the exact file and line number</div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:16px">
+        <div class="card-title">2. Fetch Source Code</div>
+        <div class="card-text">Retrieves the actual source file from GitHub with ±15 lines of context around the error</div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:16px">
+        <div class="card-title">3. AI Fix Generation</div>
+        <div class="card-text">LLM generates fix with confidence score. Only proceeds if confidence ≥ 0.8 and category is auto-fixable</div>
+      </div>
+      <div class="card card-success">
+        <div class="card-title">4. Create PR</div>
+        <div class="card-text">Creates branch, commits fix, opens PR with root cause explanation — all via GitHub API</div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">8</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 9: MONITORING & ALERTING -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Feature Deep Dive</div>
+  <h2>Monitoring &amp; <span>Predictive Alerting</span></h2>
+
+  <div class="two-col">
+    <div>
+      <p style="font-size:1.02em;line-height:1.8;margin-bottom:24px">
+        SynapseOps runs <strong style="color:var(--white)">7 background monitoring jobs</strong> on configurable intervals, continuously analyzing production health and alerting before issues impact users.
+      </p>
+
+      <table>
+        <thead><tr><th>Job</th><th>Interval</th><th>What It Does</th></tr></thead>
+        <tbody>
+          <tr><td>Error Monitor</td><td>60s</td><td>Checks 5xx error rate against threshold</td></tr>
+          <tr><td>Slow API Monitor</td><td>5 min</td><td>Detects slow endpoints + LLM suggestions</td></tr>
+          <tr><td>Anomaly Detection</td><td>5 min</td><td>Z-score traffic analysis + trend prediction</td></tr>
+          <tr><td>Recurring Errors</td><td>1 hour</td><td>MD5 fingerprinting over 7-day window</td></tr>
+          <tr><td>SLA Compliance</td><td>1 hour</td><td>Error rate, p99 latency, uptime checks</td></tr>
+          <tr><td>Hourly Rollup</td><td>1 hour</td><td>Metric aggregation for dashboards</td></tr>
+          <tr><td>Gate Recheck</td><td>120s</td><td>Re-evaluate held deployments</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h3>Predictive Capabilities</h3>
+      <div class="card card-accent" style="margin-bottom:16px">
+        <span class="icon" style="font-size:1.6em">📈</span>
+        <div class="card-title">Error Trend Prediction</div>
+        <div class="card-text">Linear regression on error rate history predicts threshold breaches <strong style="color:var(--warning)">up to 20 minutes in advance</strong>. Alerts fire before users are impacted.</div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:16px">
+        <span class="icon" style="font-size:1.6em">🔍</span>
+        <div class="card-title">Traffic Anomaly Detection</div>
+        <div class="card-text">Z-score analysis detects unusual traffic patterns. Alerts on spikes (z &gt; 2.5) and drops (z &lt; -2.5) with severity grading.</div>
+      </div>
+      <div class="card card-success" style="margin-bottom:16px">
+        <span class="icon" style="font-size:1.6em">📋</span>
+        <div class="card-title">SLA Tracking</div>
+        <div class="card-text">Configurable per-API targets: error rate (default 1%), p99 latency (3000ms), uptime (99.9%). Violations trigger Teams alerts.</div>
+      </div>
+      <div class="card card-warning">
+        <span class="icon" style="font-size:1.6em">🏥</span>
+        <div class="card-title">Health Score</div>
+        <div class="card-text">Composite score: <code style="background:rgba(255,255,255,0.1);color:var(--text)">error(40%) + latency(35%) + throughput(25%)</code> — single number for API health.</div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">9</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 10: DEPLOYMENT GATE -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Feature Deep Dive</div>
+  <h2>AI <span>Deployment Gate</span></h2>
+
+  <p style="font-size:1.05em;line-height:1.8;margin-bottom:32px;max-width:850px">
+    Every successful build on main/master/production is evaluated by AI before deployment. The gate analyzes real-time production metrics and makes an autonomous <strong style="color:var(--success)">PROCEED</strong> or <strong style="color:var(--danger)">HOLD</strong> decision.
+  </p>
+
+  <div class="flow" style="justify-content:center;margin:24px 0 36px">
+    <div class="flow-step">✅ Build Passes</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step">📊 Fetch Metrics</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step highlight">🤖 AI Evaluates</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" style="border-color:var(--success)">🟢 PROCEED</div>
+    <span style="color:var(--text-muted);font-size:0.9em;padding:0 4px">or</span>
+    <div class="flow-step" style="border-color:var(--danger)">🔴 HOLD</div>
+  </div>
+
+  <div class="card-grid cols-3">
+    <div class="card card-accent">
+      <span class="icon">📊</span>
+      <div class="card-title">Metrics Analyzed</div>
+      <div class="card-text">
+        <ul class="feature-list" style="margin:0">
+          <li>Server error rate (5xx)</li>
+          <li>Average response latency</li>
+          <li>Request volume / throughput</li>
+          <li>Per-API breakdown</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card card-warning">
+      <span class="icon">⏸️</span>
+      <div class="card-title">When Held</div>
+      <div class="card-text">
+        <ul class="feature-list" style="margin:0">
+          <li>Stored in DynamoDB with full context</li>
+          <li>Teams notification with hold reasons</li>
+          <li>Rechecked every 120 seconds</li>
+          <li>Auto-released when conditions improve</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card card-success">
+      <span class="icon">🚀</span>
+      <div class="card-title">When Approved</div>
+      <div class="card-text">
+        <ul class="feature-list" style="margin:0">
+          <li>Deployment proceeds automatically</li>
+          <li>Teams notification with confidence</li>
+          <li>Full audit trail in DynamoDB</li>
+          <li>Activity log + WebSocket push</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">10</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 11: CHAT ENGINE -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Feature Deep Dive</div>
+  <h2>Natural Language <span>Chat Interface</span></h2>
+
+  <div class="two-col">
+    <div>
+      <p style="font-size:1.02em;line-height:1.8;margin-bottom:24px">
+        Ask questions about your infrastructure in plain English. The chat engine uses a <strong style="color:var(--white)">3-stage intent classification</strong> system to understand queries and fetch real data before generating responses.
+      </p>
+
+      <div class="card card-accent" style="margin-bottom:16px">
+        <div class="card-title">Stage 1: Keyword Pre-Classification</div>
+        <div class="card-text">Fast keyword matching against known terms (pod, cluster, pipeline, sla, etc.)</div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:16px">
+        <div class="card-title">Stage 2: LLM Classification</div>
+        <div class="card-text">Bedrock classifies the message with an intent guide, returning intent + parameters</div>
+      </div>
+      <div class="card card-accent">
+        <div class="card-title">Stage 3: Hard Override</div>
+        <div class="card-text">If LLM returns generic intent but keywords match specific domain → forces correct intent</div>
+      </div>
+
+      <div class="highlight-box" style="margin-top:20px">
+        <p><strong style="color:var(--white)">Data-Grounded Responses:</strong> The LLM only answers using actual data fetched from CloudWatch, DynamoDB, GitHub, or Kubernetes. It never fabricates information.</p>
+      </div>
+    </div>
+
+    <div>
+      <h3>18 Supported Intents</h3>
+      <table>
+        <thead><tr><th>Intent</th><th>Data Source</th></tr></thead>
+        <tbody>
+          <tr><td>Top APIs</td><td>CloudWatch</td></tr>
+          <tr><td>Error Analysis</td><td>ErrorAnalyzer</td></tr>
+          <tr><td>Slow APIs</td><td>PerformanceAnalyzer</td></tr>
+          <tr><td>Recurring Errors</td><td>IncidentAnalyzer</td></tr>
+          <tr><td>Trace Request</td><td>CloudWatch (correlation ID)</td></tr>
+          <tr><td>Health Score</td><td>PerformanceAnalyzer</td></tr>
+          <tr><td>Period Comparison</td><td>IncidentAnalyzer</td></tr>
+          <tr><td>SLA Check</td><td>SLATracker</td></tr>
+          <tr><td>Deployment Impact</td><td>DeploymentTracker</td></tr>
+          <tr><td>Anomaly Detection</td><td>AnomalyDetector</td></tr>
+          <tr><td>Pod Status</td><td>K8sClient (kubectl)</td></tr>
+          <tr><td>Pipeline Status</td><td>GitHub API</td></tr>
+          <tr><td>PR Summary</td><td>PRStore (DynamoDB)</td></tr>
+          <tr><td>Deployment Gate</td><td>DeploymentGate</td></tr>
+          <tr><td>Incident Timeline</td><td>IncidentAnalyzer</td></tr>
+          <tr><td>Predict Errors</td><td>AnomalyDetector</td></tr>
+          <tr><td>Service Info</td><td>Static platform data</td></tr>
+          <tr><td>General</td><td>LLM freeform</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <span class="slide-number">11</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 12: DATA & STORAGE -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Data Layer</div>
+  <h2>Database &amp; <span>Storage Design</span></h2>
+
+  <p style="font-size:1.02em;line-height:1.8;margin-bottom:28px">
+    All persistent data is stored in <strong style="color:var(--white)">Amazon DynamoDB</strong> across 5 purpose-built tables, with <strong style="color:var(--white)">Redis</strong> providing a fast caching layer with graceful degradation.
+  </p>
+
+  <div class="card-grid cols-3" style="margin-bottom:32px">
+    <div class="card card-accent">
+      <span class="icon">📋</span>
+      <div class="card-title">synapse-ops-prs</div>
+      <div class="card-text">PR analysis records — risk level, summary, review, diff analysis, priority, timing. PK: repo, SK: pr_number</div>
+    </div>
+    <div class="card card-accent">
+      <span class="icon">🔄</span>
+      <div class="card-title">synapse-ops-pipelines</div>
+      <div class="card-text">Pipeline run records — workflow, status, AI failure analysis, auto-fix PR reference. PK: repo, SK: run_id</div>
+    </div>
+    <div class="card card-danger">
+      <span class="icon">🚨</span>
+      <div class="card-title">synapse-ops-alerts</div>
+      <div class="card-text">Monitoring alerts — error spikes, traffic anomalies, SLA violations, predictive warnings. PK: ALERT#{api}, SK: timestamp</div>
+    </div>
+    <div class="card card-success">
+      <span class="icon">📊</span>
+      <div class="card-title">synapse-ops-metrics</div>
+      <div class="card-text">Time-series metrics — per-API snapshots, hourly rollups, error rates, latency. PK: METRIC#{api}, SK: timestamp</div>
+    </div>
+    <div class="card card-accent">
+      <span class="icon">📝</span>
+      <div class="card-title">synapse-ops-audit</div>
+      <div class="card-text">Activity log + audit trail — agent events, auto-fix history, SLA checks, deployment gate decisions. Dual PK pattern.</div>
+    </div>
+    <div class="card card-warning">
+      <span class="icon">🚦</span>
+      <div class="card-title">synapse-ops-deployment-gate</div>
+      <div class="card-text">Held deployments — status, hold reasons, traffic conditions, auto-release tracking. PK: HELD#{repo}, SK: run_id</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3>Redis Cache Layer</h3>
+      <ul class="feature-list">
+        <li>Connection pooling (20 max connections)</li>
+        <li>Graceful degradation — all features work without Redis</li>
+        <li>Rate limiting via atomic Lua script</li>
+        <li>Webhook deduplication (24h TTL, SET NX)</li>
+        <li>Alert cooldown tracking</li>
+        <li>SLA target storage (24h TTL)</li>
+        <li>Monitored API list (30-day TTL)</li>
+        <li>Metric caching (120s–7200s TTL)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>In-Memory Fallback</h3>
+      <ul class="feature-list">
+        <li>Activity log: 500-entry in-memory ring buffer</li>
+        <li>Dedup: bounded set (10K cap, evicts oldest half)</li>
+        <li>Rate limiting: fails open (allows requests)</li>
+        <li>DynamoDB init: background thread, non-blocking</li>
+        <li>Startup: loads last 24h from DynamoDB into memory</li>
+      </ul>
+    </div>
+  </div>
+  <span class="slide-number">12</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 13: RESILIENCE & SECURITY -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Reliability</div>
+  <h2>Resilience &amp; <span>Security</span></h2>
+
+  <div class="two-col">
+    <div>
+      <h3>Error Handling &amp; Resilience</h3>
+      <div class="card card-success" style="margin-bottom:14px">
+        <div class="card-title">Exponential Backoff Retry</div>
+        <div class="card-text">All external calls (GitHub, Bedrock, Teams) use configurable retry with jitter. 3 retries, exponential delay, per-service exception types.</div>
+      </div>
+      <div class="card card-success" style="margin-bottom:14px">
+        <div class="card-title">Graceful Degradation</div>
+        <div class="card-text">
+          Redis down → in-memory fallback<br>
+          DynamoDB down → memory-only activity log<br>
+          CloudWatch empty → stream-scan fallback<br>
+          kubectl missing → empty results<br>
+          Teams webhook fails → logged, never blocks
+        </div>
+      </div>
+      <div class="card card-success">
+        <div class="card-title">Background Processing</div>
+        <div class="card-text">All heavy work (PR analysis, pipeline healing) runs in daemon threads. Webhook returns 202 immediately. Thread failures are caught and logged — never crash the server.</div>
+      </div>
+    </div>
+
+    <div>
+      <h3>Security Measures</h3>
+      <div class="card card-accent" style="margin-bottom:14px">
+        <div class="card-title">🔐 Webhook Verification</div>
+        <div class="card-text">HMAC SHA-256 signature verification on every webhook. Constant-time comparison via hmac.compare_digest().</div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:14px">
+        <div class="card-title">🐳 Container Security</div>
+        <div class="card-text">Non-root user (appuser) in Docker. No shell access in production. Health check via Python urllib.</div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:14px">
+        <div class="card-title">✅ Input Validation</div>
+        <div class="card-text">Pydantic validators on all config. Message length limits. API count limits. Query parameter bounds on all endpoints.</div>
+      </div>
+      <div class="card card-accent">
+        <div class="card-title">⚡ Rate Limiting</div>
+        <div class="card-text">Chat endpoint: 30 req/min (configurable) via Redis Lua script. Atomic INCR + EXPIRE. Fails open when Redis unavailable.</div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">13</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 14: DEPLOYMENT & INFRASTRUCTURE -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Infrastructure</div>
+  <h2>Deployment <span>Architecture</span></h2>
+
+  <div class="two-col">
+    <div>
+      <h3>Container &amp; Kubernetes</h3>
+      <div class="card card-accent" style="margin-bottom:16px">
+        <div class="card-title">🐳 Docker Image</div>
+        <div class="card-text">
+          Base: python:3.11-slim<br>
+          User: non-root (appuser)<br>
+          Health check: HTTP GET /health (30s interval)<br>
+          Entrypoint: uvicorn on port 5000
+        </div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:16px">
+        <div class="card-title">☸️ Kubernetes (EKS + Helm)</div>
+        <div class="card-text">
+          Replicas: 1 (configurable)<br>
+          Resources: 256m–512m CPU, 512Mi–1Gi memory<br>
+          Liveness: GET /health (30s period)<br>
+          Readiness: GET /health/ready (10s period)<br>
+          Service: LoadBalancer (port 80 → 5000)
+        </div>
+      </div>
+      <div class="card card-accent">
+        <div class="card-title">🔑 Secrets Management</div>
+        <div class="card-text">
+          IRSA for AWS access (Bedrock, DynamoDB, CloudWatch)<br>
+          Kubernetes Secrets for tokens (GitHub, Teams, Webhook)<br>
+          Environment variables via Helm values
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3>Required IAM Permissions</h3>
+      <table>
+        <thead><tr><th>Service</th><th>Permissions</th></tr></thead>
+        <tbody>
+          <tr><td>Bedrock</td><td>bedrock:InvokeModel</td></tr>
+          <tr><td>DynamoDB</td><td>PutItem, Query, Scan, CreateTable, DescribeTable</td></tr>
+          <tr><td>CloudWatch</td><td>StartQuery, GetQueryResults, FilterLogEvents, DescribeLogStreams</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:28px">Monitored Target Application</h3>
+      <div class="card card-success">
+        <div class="card-text">
+          SynapseOps monitors a target Node.js application running on EKS:
+          <div style="margin-top:12px">
+            <span class="tag tag-blue">/api/auth/login</span>
+            <span class="tag tag-blue">/api/auth/register</span>
+            <span class="tag tag-blue">/api/products</span>
+          </div>
+          <div style="margin-top:12px;color:var(--text-muted)">
+            Log Group: <code style="background:rgba(255,255,255,0.1);color:var(--text)">/aws/eks/auth-api</code><br>
+            APIs are configurable via MONITORED_APIS env var
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">14</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 15: REAL-TIME & NOTIFICATIONS -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Communication</div>
+  <h2>Real-Time Updates &amp; <span>Notifications</span></h2>
+
+  <div class="two-col">
+    <div>
+      <h3>WebSocket Channels</h3>
+      <div class="card card-accent" style="margin-bottom:14px">
+        <span class="icon" style="font-size:1.6em">📡</span>
+        <div class="card-title">/ws/activity</div>
+        <div class="card-text">Real-time activity feed from all agents. Every PR analysis, pipeline fix, alert, and deployment gate decision streams live to the dashboard.</div>
+      </div>
+      <div class="card card-accent" style="margin-bottom:14px">
+        <span class="icon" style="font-size:1.6em">💬</span>
+        <div class="card-title">/ws/chat</div>
+        <div class="card-text">Chat with streaming responses. 50-word chunks with typing indicator for a natural conversation feel.</div>
+      </div>
+      <div class="card card-accent">
+        <span class="icon" style="font-size:1.6em">🔔</span>
+        <div class="card-title">/ws/notifications</div>
+        <div class="card-text">Push notifications for PR reviews, pipeline failures, monitoring alerts. Instant browser updates without polling.</div>
+      </div>
+    </div>
+
+    <div>
+      <h3>Microsoft Teams Integration</h3>
+      <p style="font-size:0.95em;line-height:1.7;margin-bottom:20px">
+        All critical events are sent as <strong style="color:var(--white)">Adaptive Cards v1.4</strong> to Microsoft Teams via Power Automate webhook, with actionable buttons.
+      </p>
+
+      <div class="card card-accent" style="margin-bottom:14px">
+        <div class="card-title">🤖 PR Review Cards</div>
+        <div class="card-text">Summary, risk level, file stats, duration. Includes <strong style="color:var(--success)">Approve &amp; Merge</strong> and <strong style="color:var(--danger)">Request Changes</strong> buttons that trigger server-side actions.</div>
+      </div>
+      <div class="card card-danger" style="margin-bottom:14px">
+        <div class="card-title">🔴 Pipeline Failure Cards</div>
+        <div class="card-text">Workflow name, failure analysis, affected files. Links to GitHub run and SynapseOps dashboard.</div>
+      </div>
+      <div class="card card-warning" style="margin-bottom:14px">
+        <div class="card-title">⚠️ Alert Cards</div>
+        <div class="card-text">Error spikes, traffic anomalies, SLA violations, predictive warnings. API path, metrics, and timestamp.</div>
+      </div>
+      <div class="card card-success">
+        <div class="card-title">🚦 Deployment Gate Cards</div>
+        <div class="card-text">Hold/proceed decisions with confidence score, reasons, and current traffic conditions.</div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">15</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 16: END-TO-END FLOW -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="section-label">Integration</div>
+  <h2>End-to-End <span>Workflow</span></h2>
+
+  <p style="font-size:1.05em;line-height:1.8;margin-bottom:36px;max-width:900px">
+    Here's how SynapseOps handles the complete lifecycle of a code change — from PR creation to production deployment:
+  </p>
+
+  <div class="timeline" style="max-width:800px">
+    <div class="timeline-item">
+      <div class="tl-title">① Developer Opens PR</div>
+      <div class="tl-text">GitHub sends webhook → SynapseOps deduplicates → spawns background analysis thread</div>
+    </div>
+    <div class="timeline-item">
+      <div class="tl-title">② AI Reviews Code (15-30s)</div>
+      <div class="tl-text">5 agents analyze diff, review code, assess risk → consolidated comment posted on PR</div>
+    </div>
+    <div class="timeline-item">
+      <div class="tl-title">③ Conflict Detection</div>
+      <div class="tl-text">Checks for file overlaps with all other open PRs → warns developers to coordinate</div>
+    </div>
+    <div class="timeline-item">
+      <div class="tl-title">④ Teams Notification</div>
+      <div class="tl-text">Adaptive Card sent with summary + Approve/Reject buttons → reviewer acts from Teams</div>
+    </div>
+    <div class="timeline-item">
+      <div class="tl-title">⑤ CI/CD Pipeline Runs</div>
+      <div class="tl-text">If pipeline fails → AI analyzes logs → generates fix → opens auto-fix PR</div>
+    </div>
+    <div class="timeline-item">
+      <div class="tl-title">⑥ Deployment Gate</div>
+      <div class="tl-text">Successful build on main → AI checks production health → PROCEED or HOLD decision</div>
+    </div>
+    <div class="timeline-item">
+      <div class="tl-title">⑦ Production Monitoring</div>
+      <div class="tl-text">7 background jobs continuously monitor APIs → predictive alerts → SLA tracking</div>
+    </div>
+    <div class="timeline-item">
+      <div class="tl-title">⑧ Chat &amp; Dashboard</div>
+      <div class="tl-text">Team queries infrastructure via natural language → real-time dashboards show everything</div>
+    </div>
+  </div>
+  <span class="slide-number">16</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 17: SUMMARY & CLOSING -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="slide" style="text-align:center">
+  <div class="section-label">Summary</div>
+  <h2>Why <span>SynapseOps</span> Matters</h2>
+
+  <div class="card-grid cols-3" style="max-width:900px;margin:36px auto">
+    <div class="card" style="text-align:center;border-top:3px solid var(--success)">
+      <span class="icon">⚡</span>
+      <div class="card-title">Faster Response</div>
+      <div class="card-text">From hours of manual investigation to seconds of automated analysis and remediation</div>
+    </div>
+    <div class="card" style="text-align:center;border-top:3px solid var(--primary)">
+      <span class="icon">🛡️</span>
+      <div class="card-title">Safer Deployments</div>
+      <div class="card-text">AI-driven deployment gating prevents deploying into degraded environments</div>
+    </div>
+    <div class="card" style="text-align:center;border-top:3px solid var(--accent)">
+      <span class="icon">🔮</span>
+      <div class="card-title">Proactive, Not Reactive</div>
+      <div class="card-text">Predictive alerting catches issues before users are impacted</div>
+    </div>
+  </div>
+
+  <div class="stat-grid" style="max-width:800px;margin:40px auto">
+    <div class="stat">
+      <div class="number">6</div>
+      <div class="label">AI Agents Working<br>on Every PR</div>
+    </div>
+    <div class="stat">
+      <div class="number">12</div>
+      <div class="label">Error Categories<br>Auto-Classified</div>
+    </div>
+    <div class="stat">
+      <div class="number">24/7</div>
+      <div class="label">Continuous<br>Monitoring</div>
+    </div>
+    <div class="stat">
+      <div class="number">0</div>
+      <div class="label">Human Intervention<br>Required</div>
+    </div>
+  </div>
+
+  <div style="margin-top:48px">
+    <span class="logo-icon" style="font-size:3em">⚡</span>
+    <h2 style="border:none;margin:8px 0"><span>SynapseOps</span></h2>
+    <p style="font-size:1.15em;color:var(--text-muted);font-weight:300">Intelligent Observability · Automated Healing · Zero Downtime</p>
+    <p style="margin-top:32px;color:var(--text-muted);font-size:0.95em">Thank You</p>
+  </div>
+  <span class="slide-number">17</span>
+</div>
+
+</body>
+</html>

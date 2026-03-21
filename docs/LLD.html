@@ -1,0 +1,2448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SynapseOps — Low-Level Design Document</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a2e; --accent: #4361ee; --accent2: #3a0ca3;
+    --border: #e0e0e0; --code-bg: #f4f4f8; --table-stripe: #f8f9fc;
+    --toc-bg: #f0f2ff; --heading-border: #4361ee; --tag-bg: #eef0ff;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--fg); background: var(--bg); line-height: 1.7;
+    max-width: 1100px; margin: 0 auto; padding: 40px 48px 80px;
+  }
+  h1 {
+    font-size: 2.2em; color: var(--accent2); border-bottom: 3px solid var(--heading-border);
+    padding-bottom: 12px; margin: 0 0 8px;
+  }
+  h2 {
+    font-size: 1.55em; color: var(--accent2); margin: 48px 0 16px;
+    border-bottom: 2px solid var(--border); padding-bottom: 8px;
+  }
+  h3 { font-size: 1.2em; color: var(--accent); margin: 32px 0 12px; }
+  h4 { font-size: 1.05em; color: #555; margin: 24px 0 8px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+  ul, ol { margin: 0 0 16px 24px; }
+  li { margin-bottom: 4px; }
+  li > ul, li > ol { margin-top: 4px; margin-bottom: 4px; }
+  strong { color: #2b2d42; }
+  code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+    font-size: 0.88em; background: var(--code-bg); padding: 2px 6px;
+    border-radius: 4px; color: #c7254e;
+  }
+  pre {
+    background: #1e1e2e; color: #cdd6f4; padding: 20px 24px;
+    border-radius: 8px; overflow-x: auto; margin: 16px 0 20px;
+    font-size: 0.85em; line-height: 1.55; box-shadow: var(--shadow);
+  }
+  pre code {
+    background: none; color: inherit; padding: 0; font-size: 1em;
+  }
+  table {
+    width: 100%; border-collapse: collapse; margin: 16px 0 24px;
+    font-size: 0.92em; box-shadow: var(--shadow); border-radius: 8px;
+    overflow: hidden;
+  }
+  thead { background: var(--accent); color: #fff; }
+  th {
+    padding: 12px 16px; text-align: left; font-weight: 600;
+    font-size: 0.9em; letter-spacing: 0.3px;
+  }
+  td { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  tbody tr:nth-child(even) { background: var(--table-stripe); }
+  tbody tr:hover { background: #eef1ff; }
+  .toc {
+    background: var(--toc-bg); border: 1px solid #d0d5f5; border-radius: 10px;
+    padding: 24px 32px; margin: 24px 0 36px;
+  }
+  .toc ul { list-style: none; margin-left: 0; }
+  .toc > ul > li { margin-bottom: 6px; }
+  .toc a { font-weight: 500; }
+  @media print {
+    body { padding: 20px; font-size: 11pt; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+    table { page-break-inside: avoid; }
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+  }
+  @media (max-width: 768px) {
+    body { padding: 16px; }
+    table { font-size: 0.82em; }
+    th, td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<h1 id="synapseops-low-level-design-document">SynapseOps — Low-Level Design Document</h1>
+<p><strong>Version</strong>: 1.0<br />
+<strong>Last Updated</strong>: March 2026<br />
+<strong>Authors</strong>: SynapseOps Engineering Team</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-system-overview">System Overview</a></li>
+<li><a href="#2-architecture-diagram">Architecture Diagram</a></li>
+<li><a href="#3-technology-stack">Technology Stack</a></li>
+<li><a href="#4-module-breakdown">Module Breakdown</a></li>
+<li><a href="#5-data-flow-diagrams">Data Flow Diagrams</a></li>
+<li><a href="#6-database-design">Database Design</a></li>
+<li><a href="#7-api-reference">API Reference</a></li>
+<li><a href="#8-multi-agent-pr-analysis-pipeline">Multi-Agent PR Analysis Pipeline</a></li>
+<li><a href="#9-pipeline-monitoring--auto-healing">Pipeline Monitoring &amp; Auto-Healing</a></li>
+<li><a href="#10-api-monitoring-engine">API Monitoring Engine</a></li>
+<li><a href="#11-chat-engine">Chat Engine</a></li>
+<li><a href="#12-deployment-gate">Deployment Gate</a></li>
+<li><a href="#13-auto-fix-engine">Auto-Fix Engine</a></li>
+<li><a href="#14-conflict-detection">Conflict Detection</a></li>
+<li><a href="#15-real-time-communication-websocket">Real-Time Communication (WebSocket)</a></li>
+<li><a href="#16-caching--deduplication">Caching &amp; Deduplication</a></li>
+<li><a href="#17-error-handling--resilience">Error Handling &amp; Resilience</a></li>
+<li><a href="#18-security">Security</a></li>
+<li><a href="#19-deployment-architecture">Deployment Architecture</a></li>
+<li><a href="#20-configuration-management">Configuration Management</a></li>
+<li><a href="#21-diagnostic-tool">Diagnostic Tool</a></li>
+<li><a href="#22-file-structure-reference">File Structure Reference</a></li>
+</ol>
+<hr />
+<h2 id="1-system-overview">1. System Overview</h2>
+<p>SynapseOps is an AI-powered DevOps monitoring and observability platform that provides:</p>
+<ul>
+<li>Multi-agent PR code review with risk assessment and auto-description generation</li>
+<li>GitHub Actions pipeline failure detection, root cause analysis, and auto-healing</li>
+<li>Real-time API monitoring via CloudWatch Logs with predictive alerting</li>
+<li>AI-driven deployment gating based on live traffic health</li>
+<li>Natural language chat interface for infrastructure queries (18 intents)</li>
+<li>Anomaly detection (z-score), SLA tracking, and incident correlation</li>
+<li>Auto-fix engine with error categorization and automated PR generation</li>
+<li>PR conflict detection across open pull requests</li>
+<li>Real-time notifications via WebSocket and Microsoft Teams (Adaptive Cards)</li>
+<li>PR approve/reject actions from Teams cards</li>
+</ul>
+<p>The platform monitors a target application's APIs (e.g., <code>/api/auth/login</code>, <code>/api/auth/register</code>, <code>/api/products</code>) by analyzing CloudWatch log streams, and manages the full CI/CD lifecycle through GitHub webhook integration.</p>
+<hr />
+<h2 id="2-architecture-diagram">2. Architecture Diagram</h2>
+<pre class="code"><code>┌─────────────────────────────────────────────────────────────────────┐
+│                        BROWSER (UI Layer)                           │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│  │Dashboard │ │Pipelines │ │ Metrics  │ │ Activity │ │PR Detail │ │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ │
+│       │            │            │            │            │        │
+│  ┌────┴────────────┴────────────┴────────────┴────────────┘        │
+│  │  Chat Widget (all pages) ── WebSocket ── Notifications          │
+│  └─────────────────────────────┬───────────────────────────────────│
+└────────────────────────────────┼───────────────────────────────────┘
+                                 │ HTTP / WebSocket
+┌────────────────────────────────┼───────────────────────────────────┐
+│                    FastAPI Application (Port 5000)                  │
+│                                                                     │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │  Routes     │  │  Services    │  │  Background  │               │
+│  │  ─────────  │  │  ──────────  │  │  ──────────  │               │
+│  │  /webhook   │  │  ChatEngine  │  │  APScheduler │               │
+│  │  /api/chat  │  │  CloudWatch  │  │  (7 jobs)    │               │
+│  │  /api/metr* │  │  LLM         │  │              │               │
+│  │  /api/alert*│  │  ErrorAnalyz │  │  Webhook     │               │
+│  │  /ws/*      │  │  Anomaly     │  │  Handlers    │               │
+│  │  /dashboard │  │  SLA         │  │  (threads)   │               │
+│  │  /metrics   │  │  DeployGate  │  │              │               │
+│  │  /pipelines │  │  AutoFix     │  │              │               │
+│  │  /activity  │  │  K8sClient   │  │              │               │
+│  │  /action/*  │  │  CodeAnalyz  │  │              │               │
+│  └──────┬──────┘  └──────┬───────┘  └──────┬───────┘               │
+│         │                │                 │                        │
+│  ┌──────┴────────────────┴─────────────────┴───────────────────┐   │
+│  │                    External Services                         │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │   │
+│  │  │ Bedrock  │ │ DynamoDB │ │CloudWatch│ │  Redis   │       │   │
+│  │  │(Multi-   │ │(5 tables)│ │  Logs    │ │ (cache)  │       │   │
+│  │  │ model)   │ │          │ │ Insights │ │          │       │   │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐                    │   │
+│  │  │ GitHub   │ │  Teams   │ │Kubernetes│                    │   │
+│  │  │   API    │ │ Webhook  │ │ (kubectl)│                    │   │
+│  │  └──────────┘ └──────────┘ └──────────┘                    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────┘
+</code></pre>
+
+<hr />
+<h2 id="3-technology-stack">3. Technology Stack</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Runtime</td>
+<td>Python 3.11</td>
+<td>Application language</td>
+</tr>
+<tr>
+<td>Framework</td>
+<td>FastAPI + Uvicorn</td>
+<td>Async HTTP server with WebSocket support</td>
+</tr>
+<tr>
+<td>LLM</td>
+<td>Amazon Bedrock (multi-model)</td>
+<td>AI inference — supports Anthropic Claude, Amazon Nova, Meta Llama</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>Amazon DynamoDB</td>
+<td>Persistent storage (PRs, pipelines, alerts, metrics, audit)</td>
+</tr>
+<tr>
+<td>Log Analysis</td>
+<td>Amazon CloudWatch Logs Insights</td>
+<td>Production API log querying with stream-scan fallback</td>
+</tr>
+<tr>
+<td>Cache</td>
+<td>Redis (optional, graceful degradation)</td>
+<td>Caching, rate limiting, deduplication, SLA targets</td>
+</tr>
+<tr>
+<td>Container</td>
+<td>Docker (python:3.11-slim, non-root)</td>
+<td>Application packaging with health checks</td>
+</tr>
+<tr>
+<td>Orchestration</td>
+<td>Amazon EKS + Helm</td>
+<td>Kubernetes deployment with liveness/readiness probes</td>
+</tr>
+<tr>
+<td>CI/CD</td>
+<td>GitHub Actions</td>
+<td>Build, test, deploy pipeline</td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td>Microsoft Teams (Adaptive Cards v1.4)</td>
+<td>Alert and event notifications via Power Automate webhook</td>
+</tr>
+<tr>
+<td>Templates</td>
+<td>Jinja2</td>
+<td>Server-side HTML rendering</td>
+</tr>
+<tr>
+<td>Logging</td>
+<td>structlog (JSON)</td>
+<td>Structured logging throughout</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>kubectl (subprocess)</td>
+<td>Pod, node, service, deployment status queries</td>
+</tr>
+<tr>
+<td>HTTP Client</td>
+<td>httpx (Teams), requests (GitHub)</td>
+<td>Connection-pooled HTTP with retry</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-module-breakdown">4. Module Breakdown</h2>
+<h3 id="41-entry-point-configuration">4.1 Entry Point &amp; Configuration</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app.py</code></td>
+<td>Entry point — runs <code>uvicorn</code> on <code>app.main:app</code>, reads <code>PORT</code> env var (default 5000)</td>
+</tr>
+<tr>
+<td><code>app/main.py</code></td>
+<td>FastAPI app definition, lifespan management, route registration, webhook handlers, PR action endpoints, NoCacheHTMLMiddleware</td>
+</tr>
+<tr>
+<td><code>app/config.py</code></td>
+<td>Pydantic <code>BaseSettings</code> — all configuration via environment variables with validators</td>
+</tr>
+<tr>
+<td><code>config.py</code></td>
+<td>Root re-export of <code>app/config.py</code> settings for backward compatibility</td>
+</tr>
+<tr>
+<td><code>app/models/schemas.py</code></td>
+<td>Pydantic models: <code>ChatRequest</code>, <code>ChatResponse</code>, <code>HttpStatusCategory</code> enum</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-services-layer-appservices">4.2 Services Layer (<code>app/services/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Class/Function</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>llm.py</code></td>
+<td><code>LLMService</code></td>
+<td>Bedrock multi-model invocation (Anthropic/Nova/Meta/Converse), retry, error analysis, chat</td>
+</tr>
+<tr>
+<td><code>cloudwatch.py</code></td>
+<td><code>CloudWatchService</code></td>
+<td>CloudWatch Logs Insights queries + stream-scan fallback, API metrics, latency, top/slowest APIs</td>
+</tr>
+<tr>
+<td><code>chat_engine.py</code></td>
+<td><code>ChatEngine</code></td>
+<td>Intent classification (keyword + LLM + hard override), 18 intent handlers, data fetching, LLM response</td>
+</tr>
+<tr>
+<td><code>error_analyzer.py</code></td>
+<td><code>ErrorAnalyzer</code></td>
+<td>Error aggregation by status code, threshold alerting with cooldown, error breakdown</td>
+</tr>
+<tr>
+<td><code>log_analyzer.py</code></td>
+<td><code>LogAnalyzer</code></td>
+<td>Log search, correlation ID tracing, top APIs, API history</td>
+</tr>
+<tr>
+<td><code>anomaly_detector.py</code></td>
+<td><code>AnomalyDetector</code></td>
+<td>Traffic anomaly detection (z-score), predictive error trend (linear regression)</td>
+</tr>
+<tr>
+<td><code>performance.py</code></td>
+<td><code>PerformanceAnalyzer</code></td>
+<td>Slowest APIs with LLM optimization suggestions, composite health score</td>
+</tr>
+<tr>
+<td><code>sla_tracker.py</code></td>
+<td><code>SLATracker</code></td>
+<td>SLA compliance checking (availability, latency, error rate) with configurable per-API targets</td>
+</tr>
+<tr>
+<td><code>deployment_tracker.py</code></td>
+<td><code>DeploymentTracker</code></td>
+<td>GitHub Actions deployment tracking, error-deployment correlation (30-min window)</td>
+</tr>
+<tr>
+<td><code>deployment_gate.py</code></td>
+<td><code>DeploymentGate</code></td>
+<td>AI-driven hold/release decision, held deployment management, periodic recheck</td>
+</tr>
+<tr>
+<td><code>incident_analyzer.py</code></td>
+<td><code>IncidentAnalyzer</code></td>
+<td>Incident timeline, period-over-period comparison, recurring error detection (fingerprinting)</td>
+</tr>
+<tr>
+<td><code>auto_fix.py</code></td>
+<td><code>AutoFixService</code></td>
+<td>Error analysis with source code context, LLM fix generation, auto-fix PR creation</td>
+</tr>
+<tr>
+<td><code>code_analyzer.py</code></td>
+<td><code>CodeAnalyzer</code></td>
+<td>Node.js error categorization (12 categories), stack trace parsing, GitHub source fetching</td>
+</tr>
+<tr>
+<td><code>k8s_client.py</code></td>
+<td><code>K8sClient</code></td>
+<td>Kubernetes API via kubectl — pods, nodes, services, deployments, cluster info, resource usage</td>
+</tr>
+<tr>
+<td><code>cache.py</code></td>
+<td><code>CacheService</code></td>
+<td>Redis connection with graceful degradation, rate limiting (Lua script), alert cooldown</td>
+</tr>
+<tr>
+<td><code>dynamodb.py</code></td>
+<td><code>DynamoDBService</code></td>
+<td>DynamoDB operations — alerts, metrics, audit logs with Decimal handling</td>
+</tr>
+<tr>
+<td><code>websocket_manager.py</code></td>
+<td><code>ConnectionManager</code></td>
+<td>WebSocket connection management — activity, chat, notifications with streaming</td>
+</tr>
+<tr>
+<td><code>notifier.py</code></td>
+<td><code>NotifierService</code></td>
+<td>Teams Adaptive Card notifications with cooldown, httpx connection pooling</td>
+</tr>
+<tr>
+<td><code>retry.py</code></td>
+<td><code>retry_with_backoff</code></td>
+<td>Decorator for exponential backoff retry with jitter</td>
+</tr>
+<tr>
+<td><code>dedup.py</code></td>
+<td><code>is_duplicate()</code></td>
+<td>Redis-backed deduplication with in-memory fallback (bounded set, 10K cap)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-root-level-modules">4.3 Root-Level Modules</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agents.py</code></td>
+<td>Multi-agent PR analysis — 5 specialized agents + supervisor orchestrator + description generator</td>
+</tr>
+<tr>
+<td><code>bedrock_client.py</code></td>
+<td>Backward-compatible Bedrock API client (delegates to <code>LLMService</code>)</td>
+</tr>
+<tr>
+<td><code>github_client.py</code></td>
+<td>GitHub REST API wrapper with retry — PRs, diffs, files, comments, merges, file CRUD, workflow rerun</td>
+</tr>
+<tr>
+<td><code>pipeline_monitor.py</code></td>
+<td>GitHub Actions workflow run failure analysis, log fetching, LLM root cause analysis</td>
+</tr>
+<tr>
+<td><code>auto_healer.py</code></td>
+<td>Auto-fix PR generation for pipeline failures — fix generation, branch creation, PR opening</td>
+</tr>
+<tr>
+<td><code>conflict_detector.py</code></td>
+<td>Detects file-level conflicts between open PRs, posts comments, Teams notification</td>
+</tr>
+<tr>
+<td><code>teams_notifier.py</code></td>
+<td>PR summary Teams notification with approve/reject action buttons</td>
+</tr>
+<tr>
+<td><code>activity_log.py</code></td>
+<td>Centralized activity log — DynamoDB-persisted, in-memory cached (500 cap), WebSocket broadcast</td>
+</tr>
+<tr>
+<td><code>store.py</code></td>
+<td>DynamoDB-backed stores: <code>PRStore</code> (with stats/metrics) and <code>PipelineStore</code></td>
+</tr>
+<tr>
+<td><code>diagnose.py</code></td>
+<td>CLI diagnostic tool — checks env, dependencies, server, AWS, Redis, GitHub token, Teams webhook</td>
+</tr>
+</tbody>
+</table>
+<h3 id="44-routes-approutes">4.4 Routes (<code>app/routes/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Prefix</th>
+<th>Endpoints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>chat.py</code></td>
+<td><code>/api/chat</code></td>
+<td><code>POST /</code> — Chat message processing with rate limiting</td>
+</tr>
+<tr>
+<td><code>metrics.py</code></td>
+<td><code>/api/metrics</code></td>
+<td>13 endpoints — top APIs, slowest, history, health score, errors, recurring, correlation, predict, anomaly, compare, timeline, SLA, deployments</td>
+</tr>
+<tr>
+<td><code>alerts.py</code></td>
+<td><code>/api/alerts</code></td>
+<td>8 endpoints — monitored APIs CRUD, error check, alert history, auto-fix trigger, categorize, fix history, audit logs</td>
+</tr>
+<tr>
+<td><code>websockets.py</code></td>
+<td>—</td>
+<td><code>WS /ws/activity</code>, <code>WS /ws/chat</code>, <code>WS /ws/notifications</code>, <code>GET /ws/stats</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="45-background-tasks-apptasksschedulerpy">4.5 Background Tasks (<code>app/tasks/scheduler.py</code>)</h3>
+<p>7 scheduled jobs via APScheduler:</p>
+<table>
+<thead>
+<tr>
+<th>Job ID</th>
+<th>Function</th>
+<th>Interval</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error_monitor</code></td>
+<td><code>monitor_error_rates()</code></td>
+<td>configurable (default 60s)</td>
+<td>Error rate threshold checking per API</td>
+</tr>
+<tr>
+<td><code>slow_monitor</code></td>
+<td><code>monitor_slow_apis()</code></td>
+<td>5 min</td>
+<td>Slow API detection with Teams alerts</td>
+</tr>
+<tr>
+<td><code>anomaly</code></td>
+<td><code>run_anomaly_detection()</code></td>
+<td>5 min</td>
+<td>Predictive trend + traffic anomaly per API</td>
+</tr>
+<tr>
+<td><code>recurring</code></td>
+<td><code>run_recurring_error_check()</code></td>
+<td>1 hour</td>
+<td>Recurring error pattern detection (7-day window)</td>
+</tr>
+<tr>
+<td><code>sla</code></td>
+<td><code>run_sla_check()</code></td>
+<td>1 hour</td>
+<td>SLA compliance checking per API</td>
+</tr>
+<tr>
+<td><code>rollup</code></td>
+<td><code>hourly_rollup()</code></td>
+<td>1 hour</td>
+<td>Metric aggregation and caching</td>
+</tr>
+<tr>
+<td><code>deployment_gate_recheck</code></td>
+<td><code>recheck_held_deployments()</code></td>
+<td>120s</td>
+<td>Re-evaluate held deployments against current conditions</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-data-flow-diagrams">5. Data Flow Diagrams</h2>
+<h3 id="51-pr-analysis-flow">5.1 PR Analysis Flow</h3>
+<pre class="code"><code>GitHub (PR opened/synchronized/reopened)
+        │
+        ▼
+  POST /webhook
+  (HMAC SHA-256 signature verification)
+        │
+        ▼
+  Delivery-level dedup (X-GitHub-Delivery header)
+        │
+        ▼
+  PR-level dedup (repo + pr_number + head_sha)
+  ──yes──▶ Return 202 (skip)
+        │ no
+        ▼
+  Spawn background daemon thread
+  (return 202 immediately)
+        │
+        ▼
+  github_client.get_pr_details()
+  github_client.get_pr_diff()
+  github_client.get_pr_files()
+        │
+        ├──▶ check_and_generate_description()
+        │     └─ Auto-generate PR description if body is empty/short
+        │
+        ├──▶ check_conflicts()
+        │     └─ Compare files against all other open PRs
+        │     └─ Post conflict comment + Teams notification
+        │
+        ▼
+  ┌─────────────────────────────────────────┐
+  │         Multi-Agent Pipeline            │
+  │                                         │
+  │  1. Diff Analyst Agent                  │
+  │     → Analyzes code changes             │
+  │                                         │
+  │  2. Code Reviewer Agent                 │
+  │     → Security, performance, style      │
+  │                                         │
+  │  3. Summary Generator Agent             │
+  │     → Human-readable summary + risk     │
+  │                                         │
+  │  4. Priority Assessor Agent             │
+  │     → Risk level + priority ranking     │
+  │                                         │
+  │  5. Supervisor Agent                    │
+  │     → Consolidates all agent outputs    │
+  └─────────────────────────────────────────┘
+        │
+        ▼
+  ┌─────────────────────┐
+  │  Post Results        │
+  │  • PR comment        │
+  │  • DynamoDB record   │
+  │  • Activity log      │
+  │  • Teams notification│
+  │    (with approve/    │
+  │     reject buttons)  │
+  │  • WebSocket push    │
+  └─────────────────────┘
+</code></pre>
+
+<h3 id="52-pipeline-monitoring-auto-heal-flow">5.2 Pipeline Monitoring &amp; Auto-Heal Flow</h3>
+<pre class="code"><code>GitHub (workflow_run completed, conclusion: failure)
+        │
+        ▼
+  POST /webhook
+  (delivery dedup + pipeline dedup)
+        │
+        ▼
+  Spawn background daemon thread
+        │
+        ▼
+  pipeline_monitor.process_failed_run()
+        │
+        ├──▶ Fetch workflow run jobs from GitHub
+        ├──▶ Fetch job logs from GitHub
+        ├──▶ LLM analysis of failure cause
+        ├──▶ Store in DynamoDB (pipeline_store)
+        ├──▶ Activity log entry
+        ├──▶ Teams notification (Adaptive Card)
+        │
+        ▼
+  auto_healer.attempt_auto_fix()
+        │
+        ├──▶ Generate fix via LLM (with job logs + file context)
+        ├──▶ Create branch: synapse-ops/auto-fix/{category}-{timestamp}
+        ├──▶ Commit fixed files via GitHub API
+        ├──▶ Open auto-fix PR
+        ├──▶ Teams notification
+        └──▶ Activity log entry
+</code></pre>
+
+<h3 id="53-api-monitoring-loop">5.3 API Monitoring Loop</h3>
+<pre class="code"><code>APScheduler (runs on configured intervals)
+        │
+        ├──▶ error_monitor (60s default)
+        │     └─ CloudWatch query → ErrorAnalyzer → Alert if server_error_rate ≥ threshold
+        │
+        ├──▶ slow_monitor (5 min)
+        │     └─ CloudWatch query → PerformanceAnalyzer → LLM suggestions → Alert
+        │
+        ├──▶ anomaly (5 min)
+        │     ├─ predict_error_trend() → Linear regression → Alert if breach in ≤20 min
+        │     └─ detect_traffic_anomaly() → Z-score → Alert if |z| &gt; 2.5
+        │
+        ├──▶ recurring (1 hour)
+        │     └─ IncidentAnalyzer → MD5 fingerprinting → Alert top 3 recurring errors
+        │
+        ├──▶ sla (1 hour)
+        │     └─ SLATracker → Check error_rate, p99_latency, uptime → Alert on violations
+        │
+        ├──▶ rollup (1 hour)
+        │     └─ Aggregate metrics per API → Store in DynamoDB + cache
+        │
+        └──▶ deployment_gate_recheck (120s)
+              └─ Re-evaluate held deployments → Auto-release if conditions improve
+
+Each monitoring job:
+  1. Queries CloudWatch Logs Insights (with stream-scan fallback)
+  2. Analyzes results
+  3. Stores metrics in DynamoDB
+  4. If threshold breached → creates alert → Teams notification
+  5. Pushes update via WebSocket
+</code></pre>
+
+<h3 id="54-chat-engine-flow">5.4 Chat Engine Flow</h3>
+<pre class="code"><code>User types message in chat widget
+        │
+        ▼
+  POST /api/chat/
+  (rate limiting via Redis Lua script)
+        │
+        ▼
+  ChatEngine._classify_intent(message)
+        │
+        ├──▶ Step 1: Keyword pre-classification (_KW_MAP)
+        │     Checks for known keywords (pod, cluster, pipeline, etc.)
+        │
+        ├──▶ Step 2: LLM classification
+        │     Sends message + intent guide to Bedrock
+        │     Returns: { intent, params }
+        │
+        └──▶ Step 3: Hard override
+              If LLM says general/service_info but keywords match → force correct intent
+        │
+        ▼
+  Route to handler based on intent:
+  ┌──────────────────────────────────────────────────────────┐
+  │ Intent              │ Handler                            │
+  │─────────────────────│────────────────────────────────────│
+  │ top_apis            │ CloudWatch → top API usage          │
+  │ error_analysis      │ ErrorAnalyzer → error breakdown     │
+  │ slow_apis           │ PerformanceAnalyzer → latency       │
+  │ recurring_errors    │ IncidentAnalyzer → recurring ptrns  │
+  │ trace_request       │ CloudWatch → correlation ID search  │
+  │ health_score        │ PerformanceAnalyzer → composite     │
+  │ comparison          │ IncidentAnalyzer → period-over-prd  │
+  │ sla_check           │ SLATracker → compliance report      │
+  │ deployment_impact   │ DeploymentTracker → error correl.   │
+  │ anomaly_detection   │ AnomalyDetector → z-score analysis  │
+  │ pod_status          │ K8sClient → pods/nodes/services     │
+  │ pipeline_status     │ GitHub API → recent workflow runs   │
+  │ pr_summary          │ PRStore → recent PR reviews         │
+  │ deployment_gate     │ DeploymentGate → gate status        │
+  │ service_info        │ Static platform description         │
+  │ general             │ LLM freeform response               │
+  └──────────────────────────────────────────────────────────┘
+        │
+        ▼
+  LLM generates human-readable response from data
+  (system prompt enforces data-only answers, no fabrication)
+        │
+        ▼
+  Return { response, data, intent }
+</code></pre>
+
+<h3 id="55-deployment-gate-flow">5.5 Deployment Gate Flow</h3>
+<pre class="code"><code>GitHub (workflow_run completed, conclusion: success, branch: main/master/production)
+  — OR —
+GitHub (deployment event)
+        │
+        ▼
+  POST /webhook → deployment gate check
+  (delivery dedup + deploy dedup)
+        │
+        ▼
+  DeploymentGate.evaluate()
+        │
+        ├──▶ Fetch current CloudWatch metrics per monitored API
+        │     • Error rate (server errors)
+        │     • Average latency
+        │     • Request volume
+        │
+        ├──▶ LLM evaluates deployment safety
+        │     Input: metrics + deployment context
+        │     Output: { decision: PROCEED|HOLD, confidence, reasons }
+        │
+        ├──▶ If HOLD → Store held deployment in DynamoDB
+        │              → Teams notification with release info
+        │
+        └──▶ If PROCEED → Log approval
+                        → Teams notification
+
+  Periodic recheck (every 120s):
+        │
+        ├──▶ Load all pending held deployments
+        ├──▶ Re-analyze current conditions
+        ├──▶ If conditions improved → auto-release + notify
+        └──▶ If still unhealthy → keep held
+</code></pre>
+
+<hr />
+<h2 id="6-database-design">6. Database Design</h2>
+<p>All tables use the prefix from <code>DYNAMODB_TABLE_PREFIX</code> (default: <code>synapse-ops</code>).</p>
+<h3 id="61-dynamodb-tables">6.1 DynamoDB Tables</h3>
+<h4 id="synapse-ops-prs-pr-analysis-records"><code>synapse-ops-prs</code> — PR Analysis Records</h4>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>repo</code></td>
+<td>String</td>
+<td>PK</td>
+<td>Repository (owner/name)</td>
+</tr>
+<tr>
+<td><code>pr_number</code></td>
+<td>Number</td>
+<td>SK</td>
+<td>Pull request number</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>String</td>
+<td>—</td>
+<td>PR title</td>
+</tr>
+<tr>
+<td><code>author</code></td>
+<td>String</td>
+<td>—</td>
+<td>PR author</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>String</td>
+<td>—</td>
+<td>Analysis status</td>
+</tr>
+<tr>
+<td><code>risk_level</code></td>
+<td>String</td>
+<td>—</td>
+<td>Low / Medium / High</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td>String</td>
+<td>—</td>
+<td>AI-generated summary</td>
+</tr>
+<tr>
+<td><code>review</code></td>
+<td>String</td>
+<td>—</td>
+<td>Full review text</td>
+</tr>
+<tr>
+<td><code>diff_analysis</code></td>
+<td>String</td>
+<td>—</td>
+<td>Diff analysis output</td>
+</tr>
+<tr>
+<td><code>priority_assessment</code></td>
+<td>String</td>
+<td>—</td>
+<td>Priority assessment</td>
+</tr>
+<tr>
+<td><code>pr_type</code></td>
+<td>String</td>
+<td>—</td>
+<td>PR type (feature/bugfix/refactor/etc.)</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>String</td>
+<td>—</td>
+<td>Priority level</td>
+</tr>
+<tr>
+<td><code>files_changed</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Number of files changed</td>
+</tr>
+<tr>
+<td><code>additions</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Lines added</td>
+</tr>
+<tr>
+<td><code>deletions</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Lines deleted</td>
+</tr>
+<tr>
+<td><code>total_duration_ms</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Analysis duration</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>String</td>
+<td>—</td>
+<td>ISO 8601 timestamp</td>
+</tr>
+</tbody>
+</table>
+<h4 id="synapse-ops-pipelines-pipeline-run-records"><code>synapse-ops-pipelines</code> — Pipeline Run Records</h4>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>repo</code></td>
+<td>String</td>
+<td>PK</td>
+<td>Repository (owner/name)</td>
+</tr>
+<tr>
+<td><code>run_id</code></td>
+<td>String</td>
+<td>SK</td>
+<td>GitHub Actions run ID</td>
+</tr>
+<tr>
+<td><code>workflow</code></td>
+<td>String</td>
+<td>—</td>
+<td>Workflow name</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>String</td>
+<td>—</td>
+<td>success / failure</td>
+</tr>
+<tr>
+<td><code>analysis</code></td>
+<td>String</td>
+<td>—</td>
+<td>AI failure analysis</td>
+</tr>
+<tr>
+<td><code>auto_fix_pr</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Auto-fix PR number (if created)</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>String</td>
+<td>—</td>
+<td>ISO 8601 timestamp</td>
+</tr>
+</tbody>
+</table>
+<h4 id="synapse-ops-alerts-monitoring-alerts"><code>synapse-ops-alerts</code> — Monitoring Alerts</h4>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pk</code></td>
+<td>String</td>
+<td>PK</td>
+<td><code>ALERT#{api_path}</code></td>
+</tr>
+<tr>
+<td><code>sk</code></td>
+<td>String</td>
+<td>SK</td>
+<td>ISO timestamp</td>
+</tr>
+<tr>
+<td><code>api_path</code></td>
+<td>String</td>
+<td>—</td>
+<td>API path</td>
+</tr>
+<tr>
+<td><code>alert_type</code></td>
+<td>String</td>
+<td>—</td>
+<td>error_rate_exceeded / traffic_anomaly / sla_violation / etc.</td>
+</tr>
+<tr>
+<td><code>error_rate</code></td>
+<td>Decimal</td>
+<td>—</td>
+<td>Error rate at time of alert</td>
+</tr>
+<tr>
+<td><code>threshold</code></td>
+<td>Decimal</td>
+<td>—</td>
+<td>Threshold that was exceeded</td>
+</tr>
+<tr>
+<td><code>total_requests</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Request count</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>String</td>
+<td>—</td>
+<td>ISO 8601 timestamp</td>
+</tr>
+</tbody>
+</table>
+<h4 id="synapse-ops-metrics-time-series-metrics"><code>synapse-ops-metrics</code> — Time-Series Metrics</h4>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pk</code></td>
+<td>String</td>
+<td>PK</td>
+<td><code>METRIC#{api_path}</code></td>
+</tr>
+<tr>
+<td><code>sk</code></td>
+<td>String</td>
+<td>SK</td>
+<td>ISO timestamp</td>
+</tr>
+<tr>
+<td><code>api_path</code></td>
+<td>String</td>
+<td>—</td>
+<td>API path</td>
+</tr>
+<tr>
+<td><code>total_requests</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Total request count</td>
+</tr>
+<tr>
+<td><code>error_count</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Error count</td>
+</tr>
+<tr>
+<td><code>error_rate</code></td>
+<td>Decimal</td>
+<td>—</td>
+<td>Error rate percentage</td>
+</tr>
+<tr>
+<td><code>server_error_rate</code></td>
+<td>Decimal</td>
+<td>—</td>
+<td>5xx error rate</td>
+</tr>
+<tr>
+<td><code>rollup_type</code></td>
+<td>String</td>
+<td>—</td>
+<td>"hourly" for rollup snapshots</td>
+</tr>
+</tbody>
+</table>
+<h4 id="synapse-ops-audit-activity-audit-log"><code>synapse-ops-audit</code> — Activity &amp; Audit Log</h4>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pk</code></td>
+<td>String</td>
+<td>PK</td>
+<td><code>ACTIVITY#YYYY-MM-DD</code> or <code>AUDIT#{action}</code></td>
+</tr>
+<tr>
+<td><code>sk</code></td>
+<td>String</td>
+<td>SK</td>
+<td>ISO timestamp</td>
+</tr>
+<tr>
+<td><code>agent</code></td>
+<td>String</td>
+<td>—</td>
+<td>Agent name (e.g., "PR Reviewer")</td>
+</tr>
+<tr>
+<td><code>event</code></td>
+<td>String</td>
+<td>—</td>
+<td>Event type (started/processing/completed/error)</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>String</td>
+<td>—</td>
+<td>Human-readable description (max 500 chars)</td>
+</tr>
+<tr>
+<td><code>action</code></td>
+<td>String</td>
+<td>—</td>
+<td>Audit action (e.g., "auto_fix_analysis", "sla_check")</td>
+</tr>
+<tr>
+<td><code>repo</code></td>
+<td>String</td>
+<td>—</td>
+<td>Repository context</td>
+</tr>
+<tr>
+<td><code>pr_number</code></td>
+<td>Number</td>
+<td>—</td>
+<td>PR number (if applicable)</td>
+</tr>
+<tr>
+<td><code>duration_ms</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Operation duration</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>Decimal</td>
+<td>—</td>
+<td>Unix timestamp</td>
+</tr>
+</tbody>
+</table>
+<h4 id="synapse-ops-deployment-gate-held-deployments"><code>synapse-ops-deployment-gate</code> — Held Deployments</h4>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pk</code></td>
+<td>String</td>
+<td>PK</td>
+<td><code>HELD#{repo}</code></td>
+</tr>
+<tr>
+<td><code>sk</code></td>
+<td>String</td>
+<td>SK</td>
+<td><code>{run_id}</code></td>
+</tr>
+<tr>
+<td><code>repo</code></td>
+<td>String</td>
+<td>—</td>
+<td>Repository</td>
+</tr>
+<tr>
+<td><code>run_id</code></td>
+<td>Number</td>
+<td>—</td>
+<td>Workflow run ID</td>
+</tr>
+<tr>
+<td><code>workflow</code></td>
+<td>String</td>
+<td>—</td>
+<td>Workflow name</td>
+</tr>
+<tr>
+<td><code>branch</code></td>
+<td>String</td>
+<td>—</td>
+<td>Branch name</td>
+</tr>
+<tr>
+<td><code>commit_sha</code></td>
+<td>String</td>
+<td>—</td>
+<td>Short commit SHA</td>
+</tr>
+<tr>
+<td><code>sender</code></td>
+<td>String</td>
+<td>—</td>
+<td>User who triggered</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>String</td>
+<td>—</td>
+<td>held / released / deployed</td>
+</tr>
+<tr>
+<td><code>reasons</code></td>
+<td>List</td>
+<td>—</td>
+<td>Hold reasons from LLM</td>
+</tr>
+<tr>
+<td><code>conditions</code></td>
+<td>Map</td>
+<td>—</td>
+<td>Traffic conditions at hold time</td>
+</tr>
+<tr>
+<td><code>held_at</code></td>
+<td>String</td>
+<td>—</td>
+<td>ISO timestamp</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-api-reference">7. API Reference</h2>
+<h3 id="71-webhook-endpoint">7.1 Webhook Endpoint</h3>
+<pre class="code"><code>POST /webhook
+Headers:
+  X-Hub-Signature-256: sha256=&lt;HMAC&gt;
+  X-GitHub-Event: pull_request | workflow_run | deployment
+  X-GitHub-Delivery: &lt;delivery-id&gt;
+
+Handled Events:
+  • pull_request (opened, synchronize, reopened) → PR analysis pipeline
+  • workflow_run (completed, failure)             → Pipeline analysis + auto-heal
+  • workflow_run (completed, success, main/master) → Deployment gate evaluation
+  • deployment                                     → Deployment gate evaluation
+
+Deduplication:
+  • Delivery-level: X-GitHub-Delivery header
+  • PR-level: repo + pr_number + head_sha
+  • Pipeline-level: repo + run_id
+  • Deploy-level: repo + run_id or deployment_id
+</code></pre>
+
+<h3 id="72-chat-api">7.2 Chat API</h3>
+<pre class="code"><code>POST /api/chat/
+Body: {
+  &quot;message&quot;: &quot;show me error breakdown&quot;,
+  &quot;context&quot;: {
+    &quot;time_range&quot;: &quot;24h&quot;,
+    &quot;last_intent&quot;: &quot;error_analysis&quot;
+  }
+}
+Response: {
+  &quot;response&quot;: &quot;Here's the error breakdown...&quot;,
+  &quot;data&quot;: { ... },
+  &quot;intent&quot;: { &quot;intent&quot;: &quot;error_analysis&quot;, &quot;params&quot;: {} }
+}
+
+Rate Limit: Configurable (default 30 req/min) via Redis Lua script
+</code></pre>
+
+<h3 id="73-page-routes-server-side-rendered">7.3 Page Routes (Server-Side Rendered)</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Template</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td>GET</td>
+<td><code>dashboard.html</code></td>
+<td>Main dashboard with PR stats cards</td>
+</tr>
+<tr>
+<td><code>/dashboard</code></td>
+<td>GET</td>
+<td><code>dashboard.html</code></td>
+<td>Alias for <code>/</code></td>
+</tr>
+<tr>
+<td><code>/pipelines</code></td>
+<td>GET</td>
+<td><code>pipelines.html</code></td>
+<td>Pipeline runs table with stats</td>
+</tr>
+<tr>
+<td><code>/pipeline/{repo}/{run_id}</code></td>
+<td>GET</td>
+<td><code>pipeline_detail.html</code></td>
+<td>Pipeline run detail</td>
+</tr>
+<tr>
+<td><code>/metrics</code></td>
+<td>GET</td>
+<td><code>metrics.html</code></td>
+<td>API monitoring metrics</td>
+</tr>
+<tr>
+<td><code>/activity</code></td>
+<td>GET</td>
+<td><code>activity.html</code></td>
+<td>Real-time activity log</td>
+</tr>
+<tr>
+<td><code>/pr/{repo}/{pr_number}</code></td>
+<td>GET</td>
+<td><code>pr_detail.html</code></td>
+<td>PR analysis detail</td>
+</tr>
+<tr>
+<td><code>/test</code></td>
+<td>GET/POST</td>
+<td><code>test.html</code></td>
+<td>Manual PR analysis test page</td>
+</tr>
+<tr>
+<td><code>/action/approve/{repo}/{pr_number}</code></td>
+<td>GET/POST</td>
+<td><code>action.html</code></td>
+<td>PR approve &amp; merge (Teams callback)</td>
+</tr>
+<tr>
+<td><code>/action/reject/{repo}/{pr_number}</code></td>
+<td>GET/POST</td>
+<td><code>action.html</code></td>
+<td>PR request changes (Teams callback)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="74-rest-api-endpoints">7.4 REST API Endpoints</h3>
+<h4 id="health">Health</h4>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/health</code></td>
+<td>GET</td>
+<td>Basic health check</td>
+</tr>
+<tr>
+<td><code>/health/ready</code></td>
+<td>GET</td>
+<td>Readiness check (Redis + DynamoDB connectivity)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="pr-data">PR Data</h4>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/stats</code></td>
+<td>GET</td>
+<td>PR analysis statistics</td>
+</tr>
+<tr>
+<td><code>/api/pr-metrics</code></td>
+<td>GET</td>
+<td>PR metrics (risk distribution, avg duration)</td>
+</tr>
+<tr>
+<td><code>/api/prs</code></td>
+<td>GET</td>
+<td>All PR records</td>
+</tr>
+<tr>
+<td><code>/api/pr/approve</code></td>
+<td>POST</td>
+<td>Approve and merge PR (JSON API)</td>
+</tr>
+<tr>
+<td><code>/api/pr/reject</code></td>
+<td>POST</td>
+<td>Request changes on PR (JSON API)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="activity-pipelines">Activity &amp; Pipelines</h4>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/activity</code></td>
+<td>GET</td>
+<td>Activity log entries (supports <code>since</code> cursor)</td>
+</tr>
+<tr>
+<td><code>/api/pipelines</code></td>
+<td>GET</td>
+<td>Pipeline records with stats (limit 20)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="deployment-gate">Deployment Gate</h4>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/deployment-gate/status</code></td>
+<td>GET</td>
+<td>Current conditions + held deployments</td>
+</tr>
+<tr>
+<td><code>/api/deployment-gate/held</code></td>
+<td>GET</td>
+<td>List all held deployments</td>
+</tr>
+</tbody>
+</table>
+<h4 id="metrics-apimetrics">Metrics (<code>/api/metrics/</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/metrics/top-apis</code></td>
+<td>GET</td>
+<td>Top APIs by request count</td>
+</tr>
+<tr>
+<td><code>/api/metrics/slowest-apis</code></td>
+<td>GET</td>
+<td>Slowest APIs with LLM suggestions</td>
+</tr>
+<tr>
+<td><code>/api/metrics/api-history/{api_path}</code></td>
+<td>GET</td>
+<td>API request history</td>
+</tr>
+<tr>
+<td><code>/api/metrics/health-score/{api_path}</code></td>
+<td>GET</td>
+<td>Composite health score (error + latency + throughput)</td>
+</tr>
+<tr>
+<td><code>/api/metrics/errors/by-status</code></td>
+<td>GET</td>
+<td>Error breakdown by HTTP status code</td>
+</tr>
+<tr>
+<td><code>/api/metrics/errors/recurring</code></td>
+<td>GET</td>
+<td>Recurring error patterns (7-day window)</td>
+</tr>
+<tr>
+<td><code>/api/metrics/correlation/{correlation_id}</code></td>
+<td>GET</td>
+<td>Trace request by correlation ID</td>
+</tr>
+<tr>
+<td><code>/api/metrics/predict/{api_path}</code></td>
+<td>GET</td>
+<td>Predictive error trend (linear regression)</td>
+</tr>
+<tr>
+<td><code>/api/metrics/anomaly/{api_path}</code></td>
+<td>GET</td>
+<td>Traffic anomaly detection (z-score)</td>
+</tr>
+<tr>
+<td><code>/api/metrics/compare/{api_path}</code></td>
+<td>GET</td>
+<td>Period-over-period comparison</td>
+</tr>
+<tr>
+<td><code>/api/metrics/timeline</code></td>
+<td>GET</td>
+<td>Incident timeline (errors + slow requests)</td>
+</tr>
+<tr>
+<td><code>/api/metrics/sla/{api_path}</code></td>
+<td>GET</td>
+<td>SLA compliance check</td>
+</tr>
+<tr>
+<td><code>/api/metrics/sla/{api_path}</code></td>
+<td>POST</td>
+<td>Set custom SLA targets</td>
+</tr>
+<tr>
+<td><code>/api/metrics/deployments</code></td>
+<td>GET</td>
+<td>Recent GitHub Actions deployments</td>
+</tr>
+<tr>
+<td><code>/api/metrics/deployments/correlate/{api_path}</code></td>
+<td>GET</td>
+<td>Deployment-error correlation</td>
+</tr>
+</tbody>
+</table>
+<h4 id="alerts-apialerts">Alerts (<code>/api/alerts/</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/alerts/monitored-apis</code></td>
+<td>GET</td>
+<td>List monitored APIs</td>
+</tr>
+<tr>
+<td><code>/api/alerts/monitored-apis</code></td>
+<td>POST</td>
+<td>Set monitored APIs (bulk)</td>
+</tr>
+<tr>
+<td><code>/api/alerts/monitored-apis/add/{api_path}</code></td>
+<td>POST</td>
+<td>Add single monitored API</td>
+</tr>
+<tr>
+<td><code>/api/alerts/monitored-apis/remove/{api_path}</code></td>
+<td>DELETE</td>
+<td>Remove monitored API</td>
+</tr>
+<tr>
+<td><code>/api/alerts/check/{api_path}</code></td>
+<td>GET</td>
+<td>Check API error rate against threshold</td>
+</tr>
+<tr>
+<td><code>/api/alerts/history/{api_path}</code></td>
+<td>GET</td>
+<td>Alert history for an API</td>
+</tr>
+<tr>
+<td><code>/api/alerts/auto-fix</code></td>
+<td>POST</td>
+<td>Trigger auto-fix analysis</td>
+</tr>
+<tr>
+<td><code>/api/alerts/categorize</code></td>
+<td>POST</td>
+<td>Categorize error (without fix)</td>
+</tr>
+<tr>
+<td><code>/api/alerts/auto-fix/history</code></td>
+<td>GET</td>
+<td>Auto-fix attempt history</td>
+</tr>
+<tr>
+<td><code>/api/alerts/audit</code></td>
+<td>GET</td>
+<td>Audit logs (filterable by action)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="75-websocket-endpoints">7.5 WebSocket Endpoints</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+<th>Message Format</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/ws/activity</code></td>
+<td>Real-time activity feed</td>
+<td><code>{ type: "activity", data: { agent, event, message, timestamp } }</code></td>
+</tr>
+<tr>
+<td><code>/ws/chat</code></td>
+<td>Chat with streaming responses</td>
+<td><code>{ type: "chat_chunk", chunk, done }</code></td>
+</tr>
+<tr>
+<td><code>/ws/notifications</code></td>
+<td>PR/pipeline/alert notifications</td>
+<td><code>{ type: "notification", data: { ... } }</code></td>
+</tr>
+<tr>
+<td><code>/ws/stats</code></td>
+<td>GET — Connection statistics</td>
+<td><code>{ activity, chat, notifications, total }</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-multi-agent-pr-analysis-pipeline">8. Multi-Agent PR Analysis Pipeline</h2>
+<h3 id="81-agent-architecture">8.1 Agent Architecture</h3>
+<pre class="code"><code>                    ┌──────────────┐
+                    │  Supervisor  │
+                    │    Agent     │
+                    └──────┬───────┘
+                           │ orchestrates
+          ┌────────────────┼────────────────┐
+          │                │                │
+    ┌─────┴─────┐   ┌─────┴─────┐   ┌─────┴─────┐
+    │   Diff    │   │   Code    │   │  Summary  │
+    │  Analyst  │   │ Reviewer  │   │ Generator │
+    └───────────┘   └───────────┘   └───────────┘
+          │                │
+    ┌─────┴─────┐   ┌─────┴─────┐
+    │ Priority  │   │Description│
+    │ Assessor  │   │ Generator │
+    └───────────┘   └───────────┘
+</code></pre>
+
+<h3 id="82-agent-details">8.2 Agent Details</h3>
+<table>
+<thead>
+<tr>
+<th>Agent</th>
+<th>Input</th>
+<th>Output</th>
+<th>Key Logic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Diff Analyst</td>
+<td>PR diff + file list</td>
+<td>Structured change analysis</td>
+<td>Categorizes changes, identifies patterns</td>
+</tr>
+<tr>
+<td>Code Reviewer</td>
+<td>PR diff</td>
+<td>Security, performance, style issues</td>
+<td>Reviews code quality</td>
+</tr>
+<tr>
+<td>Summary Generator</td>
+<td>Diff analysis + review</td>
+<td>Human-readable summary + risk level</td>
+<td>Extracts risk level via regex</td>
+</tr>
+<tr>
+<td>Priority Assessor</td>
+<td>All previous outputs + PR metadata</td>
+<td>Risk level (Low/Medium/High) + priority</td>
+<td>Uses file count, additions, deletions, PR type</td>
+</tr>
+<tr>
+<td>Description Generator</td>
+<td>PR metadata + diff + files</td>
+<td>Auto-generated PR description</td>
+<td>Only runs if PR body is empty/short (&lt;50 chars)</td>
+</tr>
+<tr>
+<td>Supervisor</td>
+<td>All agent outputs</td>
+<td>Consolidated review comment</td>
+<td>Formats final PR comment with all sections</td>
+</tr>
+</tbody>
+</table>
+<h3 id="83-execution-model">8.3 Execution Model</h3>
+<ul>
+<li>Agents run sequentially (not parallel) to manage Bedrock rate limits</li>
+<li>Each agent call uses <code>bedrock_client.invoke_model()</code> with retry (3 attempts, exponential backoff)</li>
+<li>Total pipeline takes ~15-30 seconds depending on PR size</li>
+<li>Runs in a daemon thread to not block the webhook response (returns 202 immediately)</li>
+<li>Results posted as a single consolidated PR comment</li>
+<li>PR type extracted from diff analysis (feature/bugfix/refactor/docs/test/config/dependency)</li>
+<li>Risk level extracted via regex from summary output</li>
+<li>Priority extracted via regex from priority assessment</li>
+</ul>
+<h3 id="84-additional-pr-processing">8.4 Additional PR Processing</h3>
+<ul>
+<li><strong>Description Generation</strong>: Auto-generates PR description if body is empty or &lt; 50 chars, updates via GitHub API</li>
+<li><strong>Conflict Detection</strong>: Compares changed files against all other open PRs, posts conflict comment, sends Teams notification</li>
+<li><strong>Teams Notification</strong>: Sends Adaptive Card with approve/reject action buttons linking to <code>/action/approve</code> and <code>/action/reject</code></li>
+<li><strong>DynamoDB Storage</strong>: Full PR record stored in <code>synapse-ops-prs</code> table</li>
+<li><strong>Activity Log</strong>: Events emitted at started/processing/completed stages</li>
+</ul>
+<hr />
+<h2 id="9-pipeline-monitoring-auto-healing">9. Pipeline Monitoring &amp; Auto-Healing</h2>
+<h3 id="91-failure-detection-pipeline_monitorpy">9.1 Failure Detection (<code>pipeline_monitor.py</code>)</h3>
+<pre class="code"><code class="language-python">def process_failed_run(repo, run):
+    # 1. Fetch workflow run jobs from GitHub API
+    # 2. Fetch job logs for failed jobs
+    # 3. Send logs to LLM for root cause analysis
+    # 4. Store analysis in DynamoDB (pipeline_store)
+    # 5. Activity log entry
+    # 6. Teams notification (Adaptive Card with failure details)
+    # 7. Trigger auto-healer
+</code></pre>
+
+<h3 id="92-auto-healing-process-auto_healerpy">9.2 Auto-Healing Process (<code>auto_healer.py</code>)</h3>
+<pre class="code"><code class="language-python">def generate_fix(repo, run, failed_jobs, logs):
+    # 1. Analyze failure logs with LLM
+    # 2. Identify affected files
+    # 3. Fetch current file contents from GitHub
+    # 4. Generate fix via LLM
+
+def apply_fix(repo, branch, fix, run_id):
+    # 1. Find existing PR for branch (if any)
+    # 2. Create new branch: synapse-ops/auto-fix/{category}-{timestamp}
+    # 3. Commit fixed files via GitHub Contents API
+    # 4. Open PR with fix description
+    # 5. Teams notification
+    # 6. Activity log entry
+</code></pre>
+
+<h3 id="93-conflict-detection-conflict_detectorpy">9.3 Conflict Detection (<code>conflict_detector.py</code>)</h3>
+<p>Triggered during PR analysis (not on push events):</p>
+<pre class="code"><code class="language-python">def check_conflicts(repo, pr_number, pr_files, pr_title, pr_author):
+    # 1. Fetch all open PRs for the repo
+    # 2. For each other open PR, fetch its files
+    # 3. Compute file overlap (set intersection)
+    # 4. If overlap found:
+    #    - Post conflict comment on the PR
+    #    - Send Teams notification
+    #    - Log to activity log
+    # 5. Return list of conflicts
+</code></pre>
+
+<hr />
+<h2 id="10-api-monitoring-engine">10. API Monitoring Engine</h2>
+<h3 id="101-cloudwatch-service-appservicescloudwatchpy">10.1 CloudWatch Service (<code>app/services/cloudwatch.py</code>)</h3>
+<p>The CloudWatch service provides two query strategies:</p>
+<ol>
+<li><strong>Logs Insights queries</strong> — Preferred, uses CloudWatch Logs Insights for aggregation</li>
+<li><strong>Stream-scan fallback</strong> — When Insights returns empty, scans recent log events directly</li>
+</ol>
+<p>Key methods:
+- <code>get_api_metrics(api_path, period_minutes)</code> — Total requests, error count, error rate, server error rate
+- <code>get_latency_metrics(api_path, period_minutes)</code> — avg, p50, p95, p99 latency
+- <code>get_top_apis(hours_back, limit)</code> — Top APIs by request count
+- <code>get_slowest_apis(hours_back, limit)</code> — Slowest APIs by average latency
+- <code>get_error_logs(hours_back)</code> — Recent error log entries
+- <code>get_logs_by_correlation_id(cid)</code> — Trace a request across log entries</p>
+<p>API filtering: Uses configurable <code>monitored_apis</code> list to filter CloudWatch queries.</p>
+<h3 id="102-error-analyzer">10.2 Error Analyzer</h3>
+<ul>
+<li>Monitors server error rate (5xx only) against configurable threshold</li>
+<li>Alert cooldown via Redis (configurable, default 60 min)</li>
+<li>Error breakdown by HTTP status code category (2xx/3xx/4xx/5xx)</li>
+<li>Stores metric snapshots in DynamoDB for trend analysis</li>
+</ul>
+<h3 id="103-anomaly-detector">10.3 Anomaly Detector</h3>
+<p>Two detection algorithms:</p>
+<ol>
+<li>
+<p><strong>Predictive Error Trend</strong> (linear regression):
+   - Fits linear model to recent error rate history
+   - Predicts time to threshold breach
+   - Alerts if breach predicted within 20 minutes</p>
+</li>
+<li>
+<p><strong>Traffic Anomaly Detection</strong> (z-score):
+   - Computes z-score of current traffic vs baseline
+   - Alerts on spikes (z &gt; 2.5) or drops (z &lt; -2.5)
+   - Severity: medium (|z| &gt; 2.5), high (|z| &gt; 3.5)</p>
+</li>
+</ol>
+<h3 id="104-performance-analyzer">10.4 Performance Analyzer</h3>
+<ul>
+<li>Identifies slowest APIs with LLM-generated optimization suggestions</li>
+<li>Composite health score: <code>error_rate_score * 0.4 + latency_score * 0.35 + throughput_score * 0.25</code></li>
+<li>Results cached for 5 minutes</li>
+</ul>
+<h3 id="105-sla-tracker">10.5 SLA Tracker</h3>
+<p>Configurable per-API SLA targets (stored in Redis, 24h TTL):
+- <code>max_error_rate_pct</code> (default: 1.0%)
+- <code>max_p99_latency_ms</code> (default: 3000ms)
+- <code>min_uptime_pct</code> (default: 99.9%)</p>
+<p>Violation severity: warning (exceeded) or critical (exceeded by 2x-5x).</p>
+<h3 id="106-incident-analyzer">10.6 Incident Analyzer</h3>
+<ul>
+<li><strong>Timeline</strong>: Builds chronological timeline of errors + slow requests in a time window</li>
+<li><strong>Period Comparison</strong>: Compares current vs previous period metrics (error rate, latency, throughput)</li>
+<li><strong>Recurring Errors</strong>: MD5 fingerprinting of error messages, groups by fingerprint, identifies patterns seen on 2+ unique days</li>
+</ul>
+<hr />
+<h2 id="11-chat-engine">11. Chat Engine</h2>
+<h3 id="111-intent-classification-3-stage">11.1 Intent Classification (3-stage)</h3>
+<ol>
+<li><strong>Keyword pre-classification</strong>: Checks message against <code>_KW_MAP</code> dictionary for known keywords (pod, cluster, pipeline, deploy, sla, etc.)</li>
+<li><strong>LLM classification</strong>: Sends message + intent guide to Bedrock, returns <code>{ intent, params }</code></li>
+<li><strong>Hard override</strong>: If LLM returns <code>general</code> or <code>service_info</code> but keywords match a specific intent, forces the correct intent</li>
+</ol>
+<h3 id="112-supported-intents-18">11.2 Supported Intents (18)</h3>
+<table>
+<thead>
+<tr>
+<th>Intent</th>
+<th>Data Source</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>top_apis</code></td>
+<td>CloudWatch</td>
+<td>Top APIs by request volume</td>
+</tr>
+<tr>
+<td><code>error_analysis</code></td>
+<td>ErrorAnalyzer</td>
+<td>Error breakdown by status code</td>
+</tr>
+<tr>
+<td><code>slow_apis</code></td>
+<td>PerformanceAnalyzer</td>
+<td>Slowest APIs with suggestions</td>
+</tr>
+<tr>
+<td><code>recurring_errors</code></td>
+<td>IncidentAnalyzer</td>
+<td>Recurring error patterns</td>
+</tr>
+<tr>
+<td><code>trace_request</code></td>
+<td>CloudWatch</td>
+<td>Correlation ID search</td>
+</tr>
+<tr>
+<td><code>health_score</code></td>
+<td>PerformanceAnalyzer</td>
+<td>Composite health score</td>
+</tr>
+<tr>
+<td><code>comparison</code></td>
+<td>IncidentAnalyzer</td>
+<td>Period-over-period comparison</td>
+</tr>
+<tr>
+<td><code>sla_check</code></td>
+<td>SLATracker</td>
+<td>SLA compliance report</td>
+</tr>
+<tr>
+<td><code>deployment_impact</code></td>
+<td>DeploymentTracker</td>
+<td>Deployment-error correlation</td>
+</tr>
+<tr>
+<td><code>anomaly_detection</code></td>
+<td>AnomalyDetector</td>
+<td>Traffic anomaly + prediction</td>
+</tr>
+<tr>
+<td><code>pod_status</code></td>
+<td>K8sClient</td>
+<td>Kubernetes pod/node/service status</td>
+</tr>
+<tr>
+<td><code>pipeline_status</code></td>
+<td>GitHub API</td>
+<td>Recent workflow runs</td>
+</tr>
+<tr>
+<td><code>pr_summary</code></td>
+<td>PRStore</td>
+<td>Recent PR reviews</td>
+</tr>
+<tr>
+<td><code>deployment_gate</code></td>
+<td>DeploymentGate</td>
+<td>Gate status + held deployments</td>
+</tr>
+<tr>
+<td><code>service_info</code></td>
+<td>Static</td>
+<td>Platform description</td>
+</tr>
+<tr>
+<td><code>general</code></td>
+<td>LLM</td>
+<td>Freeform response</td>
+</tr>
+<tr>
+<td><code>incident_timeline</code></td>
+<td>IncidentAnalyzer</td>
+<td>Error + slow request timeline</td>
+</tr>
+<tr>
+<td><code>predict_errors</code></td>
+<td>AnomalyDetector</td>
+<td>Predictive error trend</td>
+</tr>
+</tbody>
+</table>
+<h3 id="113-response-generation">11.3 Response Generation</h3>
+<ul>
+<li>For data queries: System prompt enforces data-only answers, no fabrication</li>
+<li>For service info: Dedicated prompt with platform context (capabilities, monitored APIs, infrastructure)</li>
+<li>Empty result detection: Returns "no data found" message instead of hallucinating</li>
+</ul>
+<hr />
+<h2 id="12-deployment-gate">12. Deployment Gate</h2>
+<h3 id="121-evaluation-process">12.1 Evaluation Process</h3>
+<ol>
+<li>Triggered by successful workflow runs on main/master/production branches, or deployment events</li>
+<li>Fetches current traffic conditions for all monitored APIs</li>
+<li>LLM evaluates deployment safety with metrics context</li>
+<li>Decision: <code>PROCEED</code> (deploy) or <code>HOLD</code> (wait for conditions to improve)</li>
+</ol>
+<h3 id="122-held-deployment-management">12.2 Held Deployment Management</h3>
+<ul>
+<li>Held deployments stored in DynamoDB with full context</li>
+<li>Periodic recheck every 120 seconds via APScheduler</li>
+<li>Auto-release when conditions improve</li>
+<li>Teams notifications for hold, release, and proceed decisions</li>
+</ul>
+<h3 id="123-api-endpoints">12.3 API Endpoints</h3>
+<ul>
+<li><code>GET /api/deployment-gate/status</code> — Current conditions + held deployments</li>
+<li><code>GET /api/deployment-gate/held</code> — List all held deployments</li>
+</ul>
+<hr />
+<h2 id="13-auto-fix-engine">13. Auto-Fix Engine</h2>
+<h3 id="131-error-categorization-code_analyzerpy">13.1 Error Categorization (<code>code_analyzer.py</code>)</h3>
+<p>12 bug categories with auto-fixable classification:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Auto-Fixable</th>
+<th>Pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>null_reference</code></td>
+<td>Yes</td>
+<td>Cannot read property of undefined/null</td>
+</tr>
+<tr>
+<td><code>type_error</code></td>
+<td>Yes</td>
+<td>TypeError: is not a function</td>
+</tr>
+<tr>
+<td><code>missing_import</code></td>
+<td>Yes</td>
+<td>Cannot find module / Module not found</td>
+</tr>
+<tr>
+<td><code>unhandled_promise</code></td>
+<td>Yes</td>
+<td>UnhandledPromiseRejection</td>
+</tr>
+<tr>
+<td><code>syntax_error</code></td>
+<td>Yes</td>
+<td>SyntaxError / JSON.parse</td>
+</tr>
+<tr>
+<td><code>env_config</code></td>
+<td>Yes</td>
+<td>Missing env/config variable</td>
+</tr>
+<tr>
+<td><code>memory_leak</code></td>
+<td>No</td>
+<td>heap / out of memory / ENOMEM</td>
+</tr>
+<tr>
+<td><code>db_connection</code></td>
+<td>No</td>
+<td>ECONNREFUSED + database</td>
+</tr>
+<tr>
+<td><code>auth_failure</code></td>
+<td>No</td>
+<td>401/403 / Unauthorized / token expired</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>No</td>
+<td>ECONNREFUSED / ETIMEDOUT</td>
+</tr>
+<tr>
+<td><code>infrastructure</code></td>
+<td>No</td>
+<td>SIGTERM / OOMKilled / CrashLoopBackOff</td>
+</tr>
+<tr>
+<td><code>unknown</code></td>
+<td>No</td>
+<td>No pattern match</td>
+</tr>
+</tbody>
+</table>
+<h3 id="132-fix-generation-pipeline">13.2 Fix Generation Pipeline</h3>
+<pre class="code"><code>Error + Stack Trace
+        │
+        ▼
+  CodeAnalyzer.categorize_error()
+  CodeAnalyzer.parse_stack_trace()
+        │
+        ▼
+  Fetch source file from GitHub (top stack frame)
+        │
+        ▼
+  Get code context (±15 lines around error)
+        │
+        ▼
+  LLM analysis with full file + error context
+  → { root_cause, explanation, confidence, fixed_code, changes_summary }
+        │
+        ▼
+  If auto_fixable AND confidence ≥ 0.8 AND fixed_code present:
+        │
+        ├──▶ Create branch: synapse-ops/auto-fix/{category}-{timestamp}
+        ├──▶ Commit fixed file via GitHub Contents API
+        ├──▶ Open PR with root cause + changes summary
+        ├──▶ Teams notification
+        └──▶ Audit log
+</code></pre>
+
+<hr />
+<h2 id="14-conflict-detection">14. Conflict Detection</h2>
+<h3 id="141-detection-logic">14.1 Detection Logic</h3>
+<ul>
+<li>Fetches all open PRs for the repository (up to 50)</li>
+<li>Compares changed file sets using set intersection</li>
+<li>Reports overlapping files per conflicting PR</li>
+</ul>
+<h3 id="142-notification">14.2 Notification</h3>
+<ul>
+<li>Posts a Markdown comment on the PR listing all conflicts</li>
+<li>Sends Teams Adaptive Card with conflict details and action buttons</li>
+<li>Logs to activity log</li>
+</ul>
+<hr />
+<h2 id="15-real-time-communication-websocket">15. Real-Time Communication (WebSocket)</h2>
+<h3 id="151-connection-types">15.1 Connection Types</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Endpoint</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>activity</code></td>
+<td><code>/ws/activity</code></td>
+<td>Real-time activity feed from all agents</td>
+</tr>
+<tr>
+<td><code>chat</code></td>
+<td><code>/ws/chat</code></td>
+<td>Chat with streaming responses (50-word chunks)</td>
+</tr>
+<tr>
+<td><code>notifications</code></td>
+<td><code>/ws/notifications</code></td>
+<td>PR, pipeline, alert notifications</td>
+</tr>
+</tbody>
+</table>
+<h3 id="152-features">15.2 Features</h3>
+<ul>
+<li>Automatic dead connection cleanup on broadcast failure</li>
+<li>Ping/pong keepalive support</li>
+<li>Connection statistics endpoint (<code>/ws/stats</code>)</li>
+<li>Thread-safe broadcasting from background threads via stored event loop reference</li>
+<li>Chat response streaming with typing indicator and chunked delivery</li>
+</ul>
+<hr />
+<h2 id="16-caching-deduplication">16. Caching &amp; Deduplication</h2>
+<h3 id="161-redis-cache-appservicescachepy">16.1 Redis Cache (<code>app/services/cache.py</code>)</h3>
+<ul>
+<li>Connection pooling (20 max connections, 3s timeout)</li>
+<li>Graceful degradation: all operations return None/True when Redis unavailable</li>
+<li>Rate limiting via atomic Lua script (INCR + EXPIRE)</li>
+<li>Alert cooldown tracking</li>
+<li>SLA target storage (24h TTL)</li>
+<li>Monitored API list (30-day TTL)</li>
+<li>Metric caching (various TTLs: 120s for latest, 300s for slow APIs, 7200s for rollups)</li>
+</ul>
+<h3 id="162-deduplication-appservicesdeduppy">16.2 Deduplication (<code>app/services/dedup.py</code>)</h3>
+<ul>
+<li>Redis-backed with 24h TTL using <code>SET NX</code></li>
+<li>In-memory fallback with bounded set (10K cap, evicts oldest half)</li>
+<li>Dedup key types:</li>
+<li><code>dedup:pr:{repo}:{pr_number}:{head_sha}</code> — PR events</li>
+<li><code>dedup:pipe:{repo}:{run_id}</code> — Pipeline failures</li>
+<li><code>dedup:deploy:{repo}:{run_id}</code> — Deployment gate events</li>
+<li><code>dedup:delivery:{delivery_id}</code> — GitHub webhook delivery retries</li>
+</ul>
+<hr />
+<h2 id="17-error-handling-resilience">17. Error Handling &amp; Resilience</h2>
+<h3 id="171-retry-strategy-appservicesretrypy">17.1 Retry Strategy (<code>app/services/retry.py</code>)</h3>
+<ul>
+<li>Exponential backoff with jitter: <code>delay = min(base * 2^attempt + random(0,1), max_delay)</code></li>
+<li>Default: 3 retries, 1s base delay, 30s max delay</li>
+<li>Configurable retryable exception types per use case:</li>
+<li>GitHub API: <code>ConnectionError</code>, <code>Timeout</code>, <code>HTTPError</code></li>
+<li>Bedrock: <code>ClientError</code>, <code>ConnectionError</code>, <code>TimeoutError</code></li>
+<li>Teams webhook: <code>ConnectError</code>, <code>ConnectTimeout</code>, <code>ReadTimeout</code>, <code>WriteTimeout</code>, <code>PoolTimeout</code></li>
+</ul>
+<h3 id="172-graceful-degradation">17.2 Graceful Degradation</h3>
+<ul>
+<li>Redis unavailable → in-memory fallback for dedup, rate limiting fails open</li>
+<li>DynamoDB unavailable → activity log operates in-memory only</li>
+<li>CloudWatch Insights empty → stream-scan fallback</li>
+<li>Bedrock failure → error logged, operation continues</li>
+<li>Teams webhook failure → logged, does not block main flow</li>
+<li>kubectl not found → returns empty results</li>
+</ul>
+<h3 id="173-background-processing">17.3 Background Processing</h3>
+<ul>
+<li>All webhook-triggered heavy processing runs in daemon threads</li>
+<li>Webhook returns 202 immediately</li>
+<li>Thread failures are caught and logged, never crash the server</li>
+</ul>
+<hr />
+<h2 id="18-security">18. Security</h2>
+<h3 id="181-webhook-verification">18.1 Webhook Verification</h3>
+<ul>
+<li>HMAC SHA-256 signature verification using <code>X-Hub-Signature-256</code> header</li>
+<li>Constant-time comparison via <code>hmac.compare_digest()</code></li>
+<li>Warning logged (but not blocked) when <code>GITHUB_WEBHOOK_SECRET</code> is not set</li>
+</ul>
+<h3 id="182-container-security">18.2 Container Security</h3>
+<ul>
+<li>Non-root user (<code>appuser</code>) in Docker container</li>
+<li>No shell access in production image</li>
+<li>Health check via Python urllib (no curl dependency)</li>
+</ul>
+<h3 id="183-input-validation">18.3 Input Validation</h3>
+<ul>
+<li>Pydantic validators on all configuration values (thresholds, intervals, rate limits)</li>
+<li>Chat message length limit (2000 chars)</li>
+<li>Auto-fix error message limit (5000 chars)</li>
+<li>Monitored APIs limit (100 max)</li>
+<li>Query parameter validation with min/max bounds on all metric endpoints</li>
+</ul>
+<h3 id="184-rate-limiting">18.4 Rate Limiting</h3>
+<ul>
+<li>Chat endpoint: configurable rate limit (default 30 req/min) via Redis Lua script</li>
+<li>Fails open when Redis unavailable</li>
+</ul>
+<h3 id="185-middleware">18.5 Middleware</h3>
+<ul>
+<li><code>NoCacheHTMLMiddleware</code>: Sets <code>Cache-Control: no-cache, no-store, must-revalidate</code> on all HTML responses to prevent stale content</li>
+</ul>
+<hr />
+<h2 id="19-deployment-architecture">19. Deployment Architecture</h2>
+<h3 id="191-docker">19.1 Docker</h3>
+<pre class="code"><code class="language-dockerfile">FROM python:3.11-slim
+# Non-root user: appuser
+# Health check: HTTP GET /health (30s interval, 5s timeout, 3 retries)
+# Entrypoint: uvicorn app.main:app --host 0.0.0.0 --port 5000
+</code></pre>
+
+<h3 id="192-kubernetes-helm">19.2 Kubernetes (Helm)</h3>
+<pre class="code"><code class="language-yaml"># helm/synapse-ops/
+Chart: synapse-ops v0.1.0 (appVersion 1.0.0)
+
+Deployment:
+  replicas: 1
+  image: 551494044780.dkr.ecr.us-east-1.amazonaws.com/synapse-ops:latest
+  resources:
+    requests: 256m CPU, 512Mi memory
+    limits: 512m CPU, 1Gi memory
+  probes:
+    liveness: GET /health (30s period, 5s timeout, 5 failures)
+    readiness: GET /health/ready (10s period, 5s timeout, 5 failures)
+
+Service:
+  type: LoadBalancer
+  port: 80 → targetPort: 5000
+
+ServiceAccount:
+  name: synapse-ops-sa
+  IAM Role: arn:aws:iam::551494044780:role/synapse-ops-role (IRSA)
+
+Secrets:
+  TEAMS_WEBHOOK_URL, GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET
+  (stored in Kubernetes Secret, injected via secretKeyRef)
+</code></pre>
+
+<h3 id="193-iam-permissions-required">19.3 IAM Permissions Required</h3>
+<ul>
+<li><code>bedrock:InvokeModel</code> — LLM inference</li>
+<li><code>dynamodb:PutItem</code>, <code>dynamodb:Query</code>, <code>dynamodb:Scan</code>, <code>dynamodb:CreateTable</code>, <code>dynamodb:DescribeTable</code> — Data storage</li>
+<li><code>logs:StartQuery</code>, <code>logs:GetQueryResults</code>, <code>logs:FilterLogEvents</code>, <code>logs:DescribeLogStreams</code> — CloudWatch Logs</li>
+</ul>
+<hr />
+<h2 id="20-configuration-management">20. Configuration Management</h2>
+<h3 id="201-environment-variables-appconfigpy">20.1 Environment Variables (<code>app/config.py</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AWS_REGION</code></td>
+<td><code>us-east-1</code></td>
+<td>AWS region for DynamoDB</td>
+</tr>
+<tr>
+<td><code>BEDROCK_MODEL_ID</code></td>
+<td><code>anthropic.claude-3-haiku-20240307-v1:0</code></td>
+<td>Bedrock model (supports anthropic/nova/meta)</td>
+</tr>
+<tr>
+<td><code>BEDROCK_REGION</code></td>
+<td><code>us-east-1</code></td>
+<td>AWS region for Bedrock</td>
+</tr>
+<tr>
+<td><code>GITHUB_TOKEN</code></td>
+<td>—</td>
+<td>GitHub personal access token</td>
+</tr>
+<tr>
+<td><code>GITHUB_WEBHOOK_SECRET</code></td>
+<td>—</td>
+<td>Webhook HMAC secret</td>
+</tr>
+<tr>
+<td><code>GITHUB_REPO</code></td>
+<td>—</td>
+<td>Comma-separated repo list (owner/name)</td>
+</tr>
+<tr>
+<td><code>TEAMS_WEBHOOK_URL</code></td>
+<td>—</td>
+<td>Microsoft Teams webhook URL</td>
+</tr>
+<tr>
+<td><code>CLOUDWATCH_LOG_GROUP</code></td>
+<td><code>/your/service/log-group</code></td>
+<td>Target CloudWatch log group</td>
+</tr>
+<tr>
+<td><code>DYNAMODB_TABLE_PREFIX</code></td>
+<td><code>synapse-ops</code></td>
+<td>DynamoDB table name prefix</td>
+</tr>
+<tr>
+<td><code>REDIS_URL</code></td>
+<td><code>redis://localhost:6379/0</code></td>
+<td>Redis connection URL</td>
+</tr>
+<tr>
+<td><code>ERROR_RATE_THRESHOLD</code></td>
+<td><code>50.0</code></td>
+<td>Server error rate alert threshold (%)</td>
+</tr>
+<tr>
+<td><code>SLOW_API_THRESHOLD_MS</code></td>
+<td><code>2000</code></td>
+<td>Slow API latency threshold (ms)</td>
+</tr>
+<tr>
+<td><code>MONITORING_INTERVAL_SECONDS</code></td>
+<td><code>60</code></td>
+<td>Error monitoring job interval</td>
+</tr>
+<tr>
+<td><code>ALERT_COOLDOWN_MINUTES</code></td>
+<td><code>60</code></td>
+<td>Minimum time between alerts for same API</td>
+</tr>
+<tr>
+<td><code>MONITORED_APIS</code></td>
+<td>—</td>
+<td>Comma-separated API paths to monitor</td>
+</tr>
+<tr>
+<td><code>CHAT_RATE_LIMIT_PER_MINUTE</code></td>
+<td><code>30</code></td>
+<td>Chat endpoint rate limit</td>
+</tr>
+<tr>
+<td><code>POLL_INTERVAL</code></td>
+<td><code>60</code></td>
+<td>General polling interval</td>
+</tr>
+<tr>
+<td><code>APP_BASE_URL</code></td>
+<td><code>http://localhost:5000</code></td>
+<td>Base URL for action links in Teams cards</td>
+</tr>
+</tbody>
+</table>
+<h3 id="202-startup-validation">20.2 Startup Validation</h3>
+<p><code>validate_settings_on_startup()</code> checks for:
+- Placeholder CloudWatch log group
+- Missing GitHub token
+- Empty webhook secret (security warning)
+- Missing GitHub repo
+- Default Redis URL without explicit env var</p>
+<h3 id="203-monitored-api-seeding">20.3 Monitored API Seeding</h3>
+<p>On startup, <code>_seed_monitored_apis()</code> reads <code>MONITORED_APIS</code> env var and seeds the Redis cache if not already populated (30-day TTL).</p>
+<hr />
+<h2 id="21-diagnostic-tool">21. Diagnostic Tool</h2>
+<h3 id="211-diagnosepy">21.1 <code>diagnose.py</code></h3>
+<p>CLI diagnostic tool that validates the full SynapseOps setup:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What It Validates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Environment variables</td>
+<td><code>.env</code> file exists, required vars set, no placeholders</td>
+</tr>
+<tr>
+<td>Python dependencies</td>
+<td>All required packages installed (fastapi, boto3, redis, etc.)</td>
+</tr>
+<tr>
+<td>Server running</td>
+<td>HTTP GET to <code>/health</code> endpoint</td>
+</tr>
+<tr>
+<td>AWS credentials</td>
+<td>STS <code>GetCallerIdentity</code>, Bedrock client creation</td>
+</tr>
+<tr>
+<td>Redis connection</td>
+<td>Redis ping</td>
+</tr>
+<tr>
+<td>GitHub token</td>
+<td>GitHub API <code>/user</code> call, scope validation (needs <code>repo</code>)</td>
+</tr>
+<tr>
+<td>Teams webhook</td>
+<td>POST test message to webhook URL</td>
+</tr>
+</tbody>
+</table>
+<p>Run: <code>python diagnose.py</code></p>
+<hr />
+<h2 id="22-file-structure-reference">22. File Structure Reference</h2>
+<pre class="code"><code>SynapseOps/
+├── app.py                          # Entry point (uvicorn launcher)
+├── app/
+│   ├── main.py                     # FastAPI app, lifespan, webhook, routes
+│   ├── config.py                   # Pydantic settings
+│   ├── __init__.py
+│   ├── models/
+│   │   ├── schemas.py              # Pydantic request/response models
+│   │   └── __init__.py
+│   ├── routes/
+│   │   ├── alerts.py               # /api/alerts/* endpoints
+│   │   ├── chat.py                 # /api/chat/ endpoint
+│   │   ├── metrics.py              # /api/metrics/* endpoints
+│   │   ├── websockets.py           # /ws/* endpoints
+│   │   └── __init__.py
+│   ├── services/
+│   │   ├── anomaly_detector.py     # Z-score + linear regression
+│   │   ├── auto_fix.py             # Auto-fix PR generation
+│   │   ├── cache.py                # Redis with graceful degradation
+│   │   ├── chat_engine.py          # Intent classification + handlers
+│   │   ├── cloudwatch.py           # CloudWatch Logs Insights
+│   │   ├── code_analyzer.py        # Error categorization + stack parsing
+│   │   ├── dedup.py                # Webhook deduplication
+│   │   ├── deployment_gate.py      # AI deployment gating
+│   │   ├── deployment_tracker.py   # GitHub Actions tracking
+│   │   ├── dynamodb.py             # DynamoDB operations
+│   │   ├── error_analyzer.py       # Error rate monitoring
+│   │   ├── incident_analyzer.py    # Timeline + comparison + recurring
+│   │   ├── k8s_client.py           # Kubernetes via kubectl
+│   │   ├── llm.py                  # Multi-model Bedrock LLM
+│   │   ├── log_analyzer.py         # Log search + analysis
+│   │   ├── notifier.py             # Teams notifications
+│   │   ├── performance.py          # Latency analysis + health score
+│   │   ├── retry.py                # Exponential backoff decorator
+│   │   ├── sla_tracker.py          # SLA compliance
+│   │   ├── websocket_manager.py    # WebSocket connection manager
+│   │   └── __init__.py
+│   ├── static/
+│   │   ├── chat.html               # Chat widget
+│   │   └── .gitkeep
+│   └── tasks/
+│       ├── scheduler.py            # APScheduler (7 jobs)
+│       └── __init__.py
+├── agents.py                       # Multi-agent PR analysis
+├── auto_healer.py                  # Pipeline auto-fix
+├── bedrock_client.py               # Bedrock client (backward compat)
+├── config.py                       # Root config re-export
+├── conflict_detector.py            # PR conflict detection
+├── diagnose.py                     # Diagnostic CLI tool
+├── github_client.py                # GitHub API wrapper
+├── pipeline_monitor.py             # Pipeline failure analysis
+├── store.py                        # DynamoDB PR + Pipeline stores
+├── teams_notifier.py               # PR Teams notification
+├── activity_log.py                 # Activity log singleton
+├── templates/                      # Jinja2 HTML templates
+│   ├── base.html
+│   ├── dashboard.html
+│   ├── metrics.html
+│   ├── pipelines.html
+│   ├── pipeline_detail.html
+│   ├── pr_detail.html
+│   ├── activity.html
+│   ├── action.html
+│   └── test.html
+├── helm/synapse-ops/               # Helm chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+│       ├── deployment.yaml
+│       ├── service.yaml
+│       ├── secret.yaml
+│       └── serviceaccount.yaml
+├── Dockerfile
+├── requirements.txt
+├── .env.example
+└── docs/
+    └── LLD.md                      # This document
+</code></pre>
+</body>
+</html>
