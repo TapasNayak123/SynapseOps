@@ -201,10 +201,36 @@ jobs:
       - name: Inspect target group health check settings
         run: |
           echo "Inspecting target group health checks for FastAPI /health endpoint..."
+          TG_TYPE=$(aws elbv2 describe-target-groups \
+            --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
+            --query 'TargetGroups[0].TargetType' \
+            --output text)
+          TG_HC_PATH=$(aws elbv2 describe-target-groups \
+            --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
+            --query 'TargetGroups[0].HealthCheckPath' \
+            --output text)
+          TG_HC_PORT=$(aws elbv2 describe-target-groups \
+            --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
+            --query 'TargetGroups[0].HealthCheckPort' \
+            --output text)
+
           aws elbv2 describe-target-groups \
             --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
             --query 'TargetGroups[0].{TargetType:TargetType,Protocol:Protocol,Port:Port,HealthCheckProtocol:HealthCheckProtocol,HealthCheckPort:HealthCheckPort,HealthCheckPath:HealthCheckPath,Matcher:Matcher.HttpCode}' \
             --output table || true
+
+          if [ "$TG_TYPE" != "ip" ]; then
+            echo "::error::Target group target type is '$TG_TYPE'. ECS Fargate with awsvpc requires target type 'ip'."
+            exit 1
+          fi
+
+          if [ "$TG_HC_PATH" != "/health" ] && [ "$TG_HC_PATH" != "/" ]; then
+            echo "::warning::Target group health check path is '$TG_HC_PATH'. Expected '/health' or '/' for this app."
+          fi
+
+          if [ "$TG_HC_PORT" != "traffic-port" ] && [ "$TG_HC_PORT" != "5000" ]; then
+            echo "::warning::Target group health check port is '$TG_HC_PORT'. Expected 'traffic-port' or '5000'."
+          fi
 
           echo "Attempting to align target group health checks..."
           aws elbv2 modify-target-group \
@@ -254,6 +280,32 @@ jobs:
             echo "[$ATTEMPT/$MAX_ATTEMPTS] running=$RUNNING desired=$DESIRED pending=$PENDING rollout=$ROLLOUT_STATE"
             if [ -n "$ROLLOUT_REASON" ]; then
               echo "Primary rollout reason: $ROLLOUT_REASON"
+            fi
+
+            if [ "$RUNNING" = "0" ] || [ "$PENDING" != "0" ]; then
+              echo "=== Latest stopped task snapshot ==="
+              STOPPED_TASK=$(aws ecs list-tasks \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --service-name ${{ env.ECS_SERVICE }} \
+                --desired-status STOPPED \
+                --max-items 1 \
+                --query 'taskArns[0]' \
+                --output text)
+              if [ -n "$STOPPED_TASK" ] && [ "$STOPPED_TASK" != "None" ]; then
+                aws ecs describe-tasks \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --tasks "$STOPPED_TASK" \
+                  --query 'tasks[0].{Task:taskArn,Last:lastStatus,StopCode:stopCode,StoppedReason:stoppedReason,Containers:containers[*].{Name:name,Last:lastStatus,Exit:exitCode,Reason:reason}}' \
+                  --output json || true
+              else
+                echo "No stopped tasks yet"
+              fi
+
+              echo "=== Current target health ==="
+              aws elbv2 describe-target-health \
+                --target-group-arn ${{ env.TARGET_GROUP_ARN }} \
+                --query 'TargetHealthDescriptions[*].{Target:Target.Id,Port:Target.Port,State:TargetHealth.State,Reason:TargetHealth.Reason,Description:TargetHealth.Description}' \
+                --output table || true
             fi
 
             if [ "$ROLLOUT_STATE" = "FAILED" ]; then
