@@ -85,6 +85,10 @@ def generate_fix(repo: str, run: dict, failed_jobs: list, logs: str) -> dict:
         file_path = file_path.strip().strip('"').strip("'")
         if not file_path or file_path.startswith('node_modules'):
             continue
+        # Block path traversal and absolute paths
+        if '..' in file_path or file_path.startswith('/') or file_path.startswith('\\'):
+            logger.warning("Blocked suspicious file path: %s", file_path)
+            continue
             
         try:
             logger.info("Fetching file content: %s from branch %s", file_path, branch)

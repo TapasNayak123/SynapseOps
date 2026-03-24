@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     alert_cooldown_minutes: int = 60
     monitored_apis: str = ""
     chat_rate_limit_per_minute: int = 30
+    monitor_branch: str = ""
 
     @field_validator("error_rate_threshold")
     @classmethod

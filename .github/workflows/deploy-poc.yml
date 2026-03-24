@@ -1,0 +1,281 @@
+name: Deploy SynapseOps to POC (ECS Fargate)
+
+on:
+  push:
+    branches: [poc]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: synapse-ops
+  ECS_CLUSTER: auth-api-poc-cluster
+  ECS_SERVICE: synapse-ops-service
+  TASK_FAMILY: synapse-ops-task
+  CONTAINER_NAME: synapse-ops
+  ALB_DNS: synapse-ops-alb-1042958172.ap-south-1.elb.amazonaws.com
+
+jobs:
+  # ── Stage 1: Security Scanning ──────────────────────────────────────────
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install bandit safety
+
+      - name: Run Bandit (Python security linter)
+        run: bandit -r app/ *.py --severity-level medium --confidence-level medium -f json -o bandit-report.json || true
+
+      - name: Display Bandit results
+        if: always()
+        run: |
+          echo "=== Bandit Security Scan Results ==="
+          cat bandit-report.json | python -m json.tool || echo "No issues found"
+
+      - name: Run Safety (dependency vulnerability check)
+        run: safety check -r requirements.txt --output json > safety-report.json || true
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "=== Scanning for hardcoded secrets ==="
+          if grep -rn "ghp_\|sk-\|AKIA\|password\s*=\s*['\"]" --include="*.py" .; then
+            echo "::error::Hardcoded secrets detected!"
+            exit 1
+          fi
+          echo "No hardcoded secrets found"
+
+      - name: Upload scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  # ── Stage 2: Build and Push Docker Image ────────────────────────────────
+  build:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: security-scan
+    permissions:
+      contents: read
+    outputs:
+      image_tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.POC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.POC_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.POC_AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+  # ── Stage 3: Deploy to ECS Fargate ─────────────────────────────────────
+  deploy:
+    name: Deploy to ECS Fargate
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.POC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.POC_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.POC_AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Update task definition with new image
+        id: update-task-def
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Read the task definition template
+          TASK_DEF=$(cat ecs/task-definition.json)
+
+          # Replace image tag and ALB URL
+          TASK_DEF=$(echo "$TASK_DEF" | jq \
+            --arg IMAGE "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            --arg ALB_URL "http://${{ env.ALB_DNS }}" \
+            --arg GITHUB_REPO "${{ vars.POC_TARGET_GITHUB_REPO }}" \
+            --arg TEAMS_URL "${{ secrets.TEAMS_WEBHOOK_URL }}" \
+            --arg GH_TOKEN "${{ secrets.TARGET_REPO_TOKEN }}" \
+            --arg GH_SECRET "${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
+            '.containerDefinitions[0].image = $IMAGE |
+             .containerDefinitions[0].environment = [.containerDefinitions[0].environment[] |
+               if .name == "APP_BASE_URL" then .value = $ALB_URL
+               elif .name == "GITHUB_REPO" then .value = $GITHUB_REPO
+               else . end] +
+               (if $GITHUB_REPO != "" then [{"name": "GITHUB_REPO", "value": $GITHUB_REPO}] else [] end) |
+             .containerDefinitions[0].environment |= unique_by(.name) |
+             .containerDefinitions[0].environment += [
+               {"name": "TEAMS_WEBHOOK_URL", "value": $TEAMS_URL},
+               {"name": "GITHUB_TOKEN", "value": $GH_TOKEN},
+               {"name": "GITHUB_WEBHOOK_SECRET", "value": $GH_SECRET}
+             ] |
+             .containerDefinitions[0].environment |= unique_by(.name)')
+
+          echo "$TASK_DEF" > /tmp/task-def.json
+          echo "Task definition updated with image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Register task definition
+        id: register-task
+        run: |
+          TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_arn=$TASK_ARN" >> $GITHUB_OUTPUT
+          echo "Registered: $TASK_ARN"
+
+      - name: Create or update ECS service
+        env:
+          TASK_ARN: ${{ steps.register-task.outputs.task_arn }}
+        run: |
+          # Check if service exists
+          SERVICE_STATUS=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].status' \
+            --output text 2>/dev/null || echo "MISSING")
+
+          if [ "$SERVICE_STATUS" = "ACTIVE" ]; then
+            echo "Updating existing service..."
+            aws ecs update-service \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --service ${{ env.ECS_SERVICE }} \
+              --task-definition $TASK_ARN \
+              --force-new-deployment \
+              --desired-count 1
+          else
+            echo "Creating new service..."
+            aws ecs create-service \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --service-name ${{ env.ECS_SERVICE }} \
+              --task-definition $TASK_ARN \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[subnet-062e1fe4cd90f980b,subnet-0f7844e42cd47ea09],securityGroups=[sg-05dd2690bc5891e23],assignPublicIp=ENABLED}" \
+              --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:ap-south-1:127214194014:targetgroup/synapse-ops-tg/d4f789c5757638a1,containerName=${{ env.CONTAINER_NAME }},containerPort=5000" \
+              --health-check-grace-period-seconds 60
+          fi
+
+      - name: Wait for deployment to stabilize
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} || true
+
+  # ── Stage 4: Post-Deployment Validation ─────────────────────────────────
+  post-deploy-validation:
+    name: Post-Deployment Validation
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.POC_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.POC_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.POC_AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify ECS service status
+        run: |
+          echo "=== ECS Service Status ==="
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,TaskDef:taskDefinition}' \
+            --output table
+
+      - name: Verify task is running
+        run: |
+          echo "=== Running Tasks ==="
+          TASKS=$(aws ecs list-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service-name ${{ env.ECS_SERVICE }} \
+            --query 'taskArns' --output text)
+
+          if [ -z "$TASKS" ]; then
+            echo "::error::No running tasks found!"
+            exit 1
+          fi
+
+          aws ecs describe-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --tasks $TASKS \
+            --query 'tasks[*].{TaskId:taskArn,Status:lastStatus,Health:healthStatus,StartedAt:startedAt}' \
+            --output table
+
+      - name: Health check via ALB
+        run: |
+          echo "=== Health Check ==="
+          sleep 15
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ env.ALB_DNS }}/health || echo "000")
+          echo "Health endpoint returned: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::Health check returned $HTTP_CODE — service may still be starting"
+          else
+            echo "Health check passed!"
+          fi
+
+      - name: Print public URL
+        run: |
+          echo "============================================"
+          echo "🌐 SynapseOps POC URL: http://${{ env.ALB_DNS }}"
+          echo "============================================"
+
+      - name: Check recent logs
+        if: always()
+        run: |
+          echo "=== Recent Container Logs ==="
+          TASKS=$(aws ecs list-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service-name ${{ env.ECS_SERVICE }} \
+            --query 'taskArns[0]' --output text)
+
+          if [ "$TASKS" != "None" ] && [ -n "$TASKS" ]; then
+            TASK_ID=$(echo $TASKS | rev | cut -d'/' -f1 | rev)
+            aws logs get-log-events \
+              --log-group-name /ecs/synapse-ops \
+              --log-stream-name "ecs/synapse-ops/$TASK_ID" \
+              --limit 30 \
+              --query 'events[*].message' \
+              --output text 2>/dev/null || echo "Logs not yet available"
+          fi

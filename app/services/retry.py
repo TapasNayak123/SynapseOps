@@ -48,7 +48,7 @@ def retry_with_backoff(
                             func.__name__, max_retries + 1, exc,
                         )
                         raise
-                    delay = min(base_delay * (2 ** attempt) + random.uniform(0, 1), max_delay)
+                    delay = min(base_delay * (2 ** attempt) + random.uniform(0, base_delay), max_delay)
                     if on_retry:
                         on_retry(attempt + 1, exc, delay)
                     logger.warning(

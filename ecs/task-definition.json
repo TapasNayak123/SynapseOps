@@ -1,0 +1,64 @@
+{
+  "family": "synapse-ops-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::127214194014:role/synapse-ops-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::127214194014:role/synapse-ops-ecs-task-role",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "containerDefinitions": [
+    {
+      "name": "synapse-ops",
+      "image": "127214194014.dkr.ecr.ap-south-1.amazonaws.com/synapse-ops:latest",
+      "portMappings": [
+        {
+          "containerPort": 5000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {"name": "AWS_REGION", "value": "ap-south-1"},
+        {"name": "BEDROCK_REGION", "value": "ap-south-1"},
+        {"name": "BEDROCK_MODEL_ID", "value": "anthropic.claude-3-haiku-20240307-v1:0"},
+        {"name": "CLOUDWATCH_LOG_GROUP", "value": "/ecs/auth-api-poc"},
+        {"name": "DYNAMODB_TABLE_PREFIX", "value": "synapse-ops"},
+        {"name": "MONITORED_APIS", "value": "/api/auth/register,/api/auth/login,/api/products"},
+        {"name": "ERROR_RATE_THRESHOLD", "value": "50.0"},
+        {"name": "SLOW_API_THRESHOLD_MS", "value": "2000"},
+        {"name": "MONITORING_INTERVAL_SECONDS", "value": "60"},
+        {"name": "ALERT_COOLDOWN_MINUTES", "value": "60"},
+        {"name": "CHAT_RATE_LIMIT_PER_MINUTE", "value": "30"},
+        {"name": "POLL_INTERVAL", "value": "60"},
+        {"name": "REDIS_URL", "value": "redis://localhost:6379/0"},
+        {"name": "MONITOR_BRANCH", "value": "poc"},
+        {"name": "APP_BASE_URL", "value": "http://synapse-ops-alb-1042958172.ap-south-1.elb.amazonaws.com"},
+        {"name": "DISABLE_TEST_ENDPOINT", "value": "1"},
+        {"name": "GITHUB_TOKEN", "value": ""},
+        {"name": "GITHUB_WEBHOOK_SECRET", "value": ""},
+        {"name": "TEAMS_WEBHOOK_URL", "value": ""},
+        {"name": "GITHUB_REPO", "value": "TapasNayak123/aws_codethon_repo"}
+      ],
+      "secrets": [],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/synapse-ops",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\" || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    }
+  ]
+}

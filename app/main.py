@@ -13,7 +13,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -110,6 +111,28 @@ class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(NoCacheHTMLMiddleware)
 
+# CORS — restrict to same-origin; add specific origins if needed
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[get_settings().app_base_url],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# Request body size limit (1 MB)
+MAX_BODY_SIZE = 1 * 1024 * 1024
+
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_BODY_SIZE:
+            return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+        return await call_next(request)
+
+app.add_middleware(RequestSizeLimitMiddleware)
+
 # Include FastAPI routers (monitoring, chat, alerts, websockets)
 app.include_router(metrics.router)
 app.include_router(chat.router)
@@ -188,15 +211,23 @@ def pipeline_detail(request: Request, repo: str, run_id: int):
     return templates.TemplateResponse("pipeline_detail.html", {"request": request, "p": record})
 
 
-# ── Test page ─────────────────────────────────────────────────────────────
+# ── Test page (disabled in production via DISABLE_TEST_ENDPOINT=1) ─────
+
+import os as _os
+_TEST_ENDPOINT_ENABLED = not _os.environ.get("DISABLE_TEST_ENDPOINT", "")
+
 
 @app.get("/test", response_class=HTMLResponse)
 def test_pr_get(request: Request):
+    if not _TEST_ENDPOINT_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
     return templates.TemplateResponse("test.html", {"request": request, "result": None, "error": None, "form_repo": "", "form_pr_number": ""})
 
 
 @app.post("/test", response_class=HTMLResponse)
 def test_pr_post(request: Request, repo: str = Form(""), pr_number: str = Form(""), post_comment: str = Form(None)):
+    if not _TEST_ENDPOINT_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
     repo = repo.strip()
     pr_number_str = pr_number.strip()
     ctx = {"request": request, "form_repo": repo, "form_pr_number": pr_number_str}
@@ -489,8 +520,10 @@ def _process_deployment_event(repo_full_name, deployment, sender):
 
 def _verify_signature(payload: bytes, signature: str) -> bool:
     if not GITHUB_WEBHOOK_SECRET:
-        py_logger.warning("GITHUB_WEBHOOK_SECRET not set — skipping signature verification")
+        py_logger.warning("GITHUB_WEBHOOK_SECRET not set — webhook signature verification DISABLED")
         return True
+    if not signature:
+        return False
     expected = "sha256=" + hmac.new(
         GITHUB_WEBHOOK_SECRET.encode(), payload, hashlib.sha256
     ).hexdigest()
@@ -538,6 +571,12 @@ async def webhook(request: Request):
         action = payload.get("action", "")
         run = payload.get("workflow_run", {})
         conclusion = run.get("conclusion", "")
+
+        # Branch filter: if MONITOR_BRANCH is set, only process events from that branch
+        _monitor_branch = get_settings().monitor_branch
+        if _monitor_branch and run.get("head_branch", "") != _monitor_branch:
+            py_logger.info("Ignoring workflow_run on branch %s (monitoring %s only)", run.get("head_branch"), _monitor_branch)
+            return {"message": f"Ignored branch {run.get('head_branch')}"}
 
         # Deployment gate: intercept completed successful workflow runs on main/master
         if action == "completed" and conclusion == "success":

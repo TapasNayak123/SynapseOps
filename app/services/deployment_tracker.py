@@ -29,9 +29,12 @@ class DeploymentTracker:
 
             cutoff = datetime.utcnow() - timedelta(hours=hours_back)
             deployments = []
+            monitor_branch = self.settings.monitor_branch
             for run in data.get("workflow_runs", []):
                 created = datetime.fromisoformat(run["created_at"].replace("Z", "+00:00")).replace(tzinfo=None)
                 if created < cutoff:
+                    continue
+                if monitor_branch and run.get("head_branch", "") != monitor_branch:
                     continue
                 deployments.append({
                     "id": run["id"], "name": run["name"], "status": run["conclusion"],

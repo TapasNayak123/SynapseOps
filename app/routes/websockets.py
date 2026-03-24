@@ -59,8 +59,7 @@ async def websocket_chat(websocket: WebSocket):
             # Handle chat message
             message = data.get("message", "")
             if message:
-                # Import here to avoid circular dependency
-                from app.routes.chat import handle_chat_message
+                from app.services.chat_engine import ChatEngine
                 
                 # Send typing indicator
                 await manager.send_personal_message({
@@ -69,11 +68,12 @@ async def websocket_chat(websocket: WebSocket):
                 }, websocket)
                 
                 # Process the message
-                response = await handle_chat_message(
-                    message=message,
-                    history=data.get("history", []),
-                    hours_back=data.get("hours_back", 24)
-                )
+                engine = ChatEngine()
+                extra_context = {}
+                if data.get("hours_back"):
+                    extra_context["hours_back"] = data["hours_back"]
+                result = engine.process_message(message, extra_context or None)
+                response = result.get("response", "Sorry, I couldn't process that.")
                 
                 # Stream the response
                 await manager.stream_chat_response(websocket, response)
