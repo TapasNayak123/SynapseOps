@@ -190,18 +190,22 @@ jobs:
               --task-definition $TASK_ARN \
               --desired-count 1 \
               --launch-type FARGATE \
+              --deployment-configuration "deploymentCircuitBreaker={enable=true,rollback=true},maximumPercent=200,minimumHealthyPercent=50" \
               --network-configuration "awsvpcConfiguration={subnets=[subnet-062e1fe4cd90f980b,subnet-0f7844e42cd47ea09],securityGroups=[sg-05dd2690bc5891e23],assignPublicIp=ENABLED}" \
               --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:ap-south-1:127214194014:targetgroup/synapse-ops-tg/d4f789c5757638a1,containerName=${{ env.CONTAINER_NAME }},containerPort=5000" \
               --health-check-grace-period-seconds 120
           fi
 
       - name: Wait for deployment to stabilize
-        timeout-minutes: 8
+        timeout-minutes: 15
         run: |
+          set +e
           echo "Waiting for ECS service to stabilize..."
           aws ecs wait services-stable \
             --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ env.ECS_SERVICE }} || true
+            --services ${{ env.ECS_SERVICE }}
+          WAIT_EXIT=$?
+          set -e
 
           echo "=== Service Status ==="
           aws ecs describe-services \
@@ -209,6 +213,58 @@ jobs:
             --services ${{ env.ECS_SERVICE }} \
             --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Deployments:deployments[*].{Status:status,Running:runningCount,Desired:desiredCount,Rollout:rolloutState}}' \
             --output json
+
+          if [ "$WAIT_EXIT" -ne 0 ]; then
+            echo "::error::ECS service did not stabilize. Collecting diagnostics..."
+
+            echo "=== Recent ECS Service Events ==="
+            aws ecs describe-services \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --services ${{ env.ECS_SERVICE }} \
+              --query 'services[0].events[0:20].[createdAt,message]' \
+              --output table || true
+
+            echo "=== Tasks (RUNNING + STOPPED) ==="
+            TASKS=$(aws ecs list-tasks \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --service-name ${{ env.ECS_SERVICE }} \
+              --desired-status RUNNING \
+              --query 'taskArns' --output text)
+            STOPPED_TASKS=$(aws ecs list-tasks \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --service-name ${{ env.ECS_SERVICE }} \
+              --desired-status STOPPED \
+              --max-items 5 \
+              --query 'taskArns' --output text)
+
+            ALL_TASKS="$TASKS $STOPPED_TASKS"
+            if [ -n "$ALL_TASKS" ] && [ "$ALL_TASKS" != "None" ]; then
+              aws ecs describe-tasks \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --tasks $ALL_TASKS \
+                --query 'tasks[*].{Task:taskArn,Last:lastStatus,Desired:desiredStatus,Health:healthStatus,StopCode:stopCode,StoppedReason:stoppedReason,Containers:containers[*].{Name:name,Last:lastStatus,Exit:exitCode,Reason:reason}}' \
+                --output json || true
+            else
+              echo "No ECS tasks found for service"
+            fi
+
+            echo "=== Target Group Health ==="
+            TG_ARN=$(aws ecs describe-services \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --services ${{ env.ECS_SERVICE }} \
+              --query 'services[0].loadBalancers[0].targetGroupArn' \
+              --output text)
+            if [ -n "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
+              aws elbv2 describe-target-health \
+                --target-group-arn "$TG_ARN" \
+                --query 'TargetHealthDescriptions[*].{Target:Target.Id,Port:Target.Port,State:TargetHealth.State,Reason:TargetHealth.Reason,Description:TargetHealth.Description}' \
+                --output table || true
+            else
+              echo "Service has no associated target group"
+            fi
+
+            exit 1
+          fi
 
   # ── Stage 4: Post-Deployment Validation ─────────────────────────────────
   post-deploy-validation:
