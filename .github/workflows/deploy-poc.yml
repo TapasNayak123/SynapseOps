@@ -213,6 +213,14 @@ jobs:
             --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
             --query 'TargetGroups[0].HealthCheckPort' \
             --output text)
+          TG_HC_PROTOCOL=$(aws elbv2 describe-target-groups \
+            --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
+            --query 'TargetGroups[0].HealthCheckProtocol' \
+            --output text)
+          TG_MATCHER=$(aws elbv2 describe-target-groups \
+            --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
+            --query 'TargetGroups[0].Matcher.HttpCode' \
+            --output text)
 
           aws elbv2 describe-target-groups \
             --target-group-arns ${{ env.TARGET_GROUP_ARN }} \
@@ -232,18 +240,22 @@ jobs:
             echo "::warning::Target group health check port is '$TG_HC_PORT'. Expected 'traffic-port' or '5000'."
           fi
 
-          echo "Attempting to align target group health checks..."
-          aws elbv2 modify-target-group \
-            --target-group-arn ${{ env.TARGET_GROUP_ARN }} \
-            --health-check-protocol HTTP \
-            --health-check-port traffic-port \
-            --health-check-path /health \
-            --matcher HttpCode=200-399 \
-            --healthy-threshold-count 2 \
-            --unhealthy-threshold-count 5 \
-            --health-check-interval-seconds 30 \
-            --health-check-timeout-seconds 5 \
-            || echo "::warning::Unable to modify target group health checks. The deploy role lacks elasticloadbalancing:ModifyTargetGroup. Update the target group manually or grant that permission."
+          if [ "$TG_HC_PROTOCOL" = "HTTP" ] && [ "$TG_HC_PATH" = "/health" ] && [ "$TG_HC_PORT" = "traffic-port" ] && [ "$TG_MATCHER" = "200" ]; then
+            echo "Target group health checks already match the app requirements; skipping modify-target-group."
+          else
+            echo "Attempting to align target group health checks..."
+            aws elbv2 modify-target-group \
+              --target-group-arn ${{ env.TARGET_GROUP_ARN }} \
+              --health-check-protocol HTTP \
+              --health-check-port traffic-port \
+              --health-check-path /health \
+              --matcher HttpCode=200-399 \
+              --healthy-threshold-count 2 \
+              --unhealthy-threshold-count 5 \
+              --health-check-interval-seconds 30 \
+              --health-check-timeout-seconds 5 \
+              || echo "::warning::Unable to modify target group health checks. The deploy role lacks elasticloadbalancing:ModifyTargetGroup. Update the target group manually or grant that permission."
+          fi
 
           # Speed up old task drain to prevent long-running IN_PROGRESS rollouts.
           aws elbv2 modify-target-group-attributes \
