@@ -180,7 +180,8 @@ jobs:
               --service ${{ env.ECS_SERVICE }} \
               --task-definition $TASK_ARN \
               --force-new-deployment \
-              --desired-count 1
+              --desired-count 1 \
+              --health-check-grace-period-seconds 120
           else
             echo "Creating new service..."
             aws ecs create-service \
@@ -191,15 +192,23 @@ jobs:
               --launch-type FARGATE \
               --network-configuration "awsvpcConfiguration={subnets=[subnet-062e1fe4cd90f980b,subnet-0f7844e42cd47ea09],securityGroups=[sg-05dd2690bc5891e23],assignPublicIp=ENABLED}" \
               --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:ap-south-1:127214194014:targetgroup/synapse-ops-tg/d4f789c5757638a1,containerName=${{ env.CONTAINER_NAME }},containerPort=5000" \
-              --health-check-grace-period-seconds 60
+              --health-check-grace-period-seconds 120
           fi
 
       - name: Wait for deployment to stabilize
+        timeout-minutes: 8
         run: |
           echo "Waiting for ECS service to stabilize..."
           aws ecs wait services-stable \
             --cluster ${{ env.ECS_CLUSTER }} \
             --services ${{ env.ECS_SERVICE }} || true
+
+          echo "=== Service Status ==="
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Deployments:deployments[*].{Status:status,Running:runningCount,Desired:desiredCount,Rollout:rolloutState}}' \
+            --output json
 
   # ── Stage 4: Post-Deployment Validation ─────────────────────────────────
   post-deploy-validation:
