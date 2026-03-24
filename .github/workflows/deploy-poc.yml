@@ -199,13 +199,44 @@ jobs:
       - name: Wait for deployment to stabilize
         timeout-minutes: 15
         run: |
-          set +e
           echo "Waiting for ECS service to stabilize..."
-          aws ecs wait services-stable \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ env.ECS_SERVICE }}
-          WAIT_EXIT=$?
-          set -e
+          MAX_ATTEMPTS=45
+          SLEEP_SECONDS=20
+          WAIT_EXIT=1
+
+          for ATTEMPT in $(seq 1 $MAX_ATTEMPTS); do
+            SERVICE_JSON=$(aws ecs describe-services \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --services ${{ env.ECS_SERVICE }} \
+              --output json)
+
+            RUNNING=$(echo "$SERVICE_JSON" | jq -r '.services[0].runningCount // 0')
+            DESIRED=$(echo "$SERVICE_JSON" | jq -r '.services[0].desiredCount // 0')
+            PENDING=$(echo "$SERVICE_JSON" | jq -r '.services[0].pendingCount // 0')
+            ROLLOUT_STATE=$(echo "$SERVICE_JSON" | jq -r '([.services[0].deployments[]? | select(.status=="PRIMARY") | .rolloutState][0]) // "IN_PROGRESS"')
+            ROLLOUT_REASON=$(echo "$SERVICE_JSON" | jq -r '([.services[0].deployments[]? | select(.status=="PRIMARY") | .rolloutStateReason][0]) // ""')
+
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] running=$RUNNING desired=$DESIRED pending=$PENDING rollout=$ROLLOUT_STATE"
+            if [ -n "$ROLLOUT_REASON" ]; then
+              echo "Primary rollout reason: $ROLLOUT_REASON"
+            fi
+
+            if [ "$ROLLOUT_STATE" = "FAILED" ]; then
+              echo "::error::Primary deployment failed"
+              WAIT_EXIT=1
+              break
+            fi
+
+            if [ "$RUNNING" = "$DESIRED" ] && [ "$PENDING" = "0" ] && [ "$ROLLOUT_STATE" = "COMPLETED" ]; then
+              echo "ECS service is stable"
+              WAIT_EXIT=0
+              break
+            fi
+
+            if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
+              sleep $SLEEP_SECONDS
+            fi
+          done
 
           echo "=== Service Status ==="
           aws ecs describe-services \
