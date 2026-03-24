@@ -13,6 +13,7 @@ env:
   TASK_FAMILY: synapse-ops-task
   CONTAINER_NAME: synapse-ops
   ALB_DNS: synapse-ops-alb-1042958172.ap-south-1.elb.amazonaws.com
+  TARGET_GROUP_ARN: arn:aws:elasticloadbalancing:ap-south-1:127214194014:targetgroup/synapse-ops-tg/d4f789c5757638a1
 
 jobs:
   # ── Stage 1: Security Scanning ──────────────────────────────────────────
@@ -181,6 +182,7 @@ jobs:
               --task-definition $TASK_ARN \
               --force-new-deployment \
               --desired-count 1 \
+              --deployment-configuration "deploymentCircuitBreaker={enable=true,rollback=true},maximumPercent=200,minimumHealthyPercent=0" \
               --health-check-grace-period-seconds 120
           else
             echo "Creating new service..."
@@ -192,9 +194,28 @@ jobs:
               --launch-type FARGATE \
               --deployment-configuration "deploymentCircuitBreaker={enable=true,rollback=true},maximumPercent=200,minimumHealthyPercent=50" \
               --network-configuration "awsvpcConfiguration={subnets=[subnet-062e1fe4cd90f980b,subnet-0f7844e42cd47ea09],securityGroups=[sg-05dd2690bc5891e23],assignPublicIp=ENABLED}" \
-              --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:ap-south-1:127214194014:targetgroup/synapse-ops-tg/d4f789c5757638a1,containerName=${{ env.CONTAINER_NAME }},containerPort=5000" \
+              --load-balancers "targetGroupArn=${{ env.TARGET_GROUP_ARN }},containerName=${{ env.CONTAINER_NAME }},containerPort=5000" \
               --health-check-grace-period-seconds 120
           fi
+
+      - name: Enforce target group health check settings
+        run: |
+          echo "Configuring target group health checks for FastAPI /health endpoint..."
+          aws elbv2 modify-target-group \
+            --target-group-arn ${{ env.TARGET_GROUP_ARN }} \
+            --health-check-protocol HTTP \
+            --health-check-port traffic-port \
+            --health-check-path /health \
+            --matcher HttpCode=200-399 \
+            --healthy-threshold-count 2 \
+            --unhealthy-threshold-count 5 \
+            --health-check-interval-seconds 30 \
+            --health-check-timeout-seconds 5
+
+          # Speed up old task drain to prevent long-running IN_PROGRESS rollouts.
+          aws elbv2 modify-target-group-attributes \
+            --target-group-arn ${{ env.TARGET_GROUP_ARN }} \
+            --attributes Key=deregistration_delay.timeout_seconds,Value=30
 
       - name: Wait for deployment to stabilize
         timeout-minutes: 15
