@@ -288,9 +288,7 @@ jobs:
                 --cluster ${{ env.ECS_CLUSTER }} \
                 --service-name ${{ env.ECS_SERVICE }} \
                 --desired-status STOPPED \
-                --max-items 1 \
-                --query 'taskArns[0]' \
-                --output text)
+                --output json | jq -r '.taskArns[0] // empty')
               if [ -n "$STOPPED_TASK" ] && [ "$STOPPED_TASK" != "None" ]; then
                 aws ecs describe-tasks \
                   --cluster ${{ env.ECS_CLUSTER }} \
@@ -300,6 +298,13 @@ jobs:
               else
                 echo "No stopped tasks yet"
               fi
+
+              echo "=== Latest ECS service event ==="
+              aws ecs describe-services \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --services ${{ env.ECS_SERVICE }} \
+                --query 'services[0].events[0].[createdAt,message]' \
+                --output table || true
 
               echo "=== Current target health ==="
               aws elbv2 describe-target-health \
