@@ -409,6 +409,7 @@ jobs:
           fi
 
       - name: Upsert CloudWatch dashboard
+        continue-on-error: true
         env:
           DASHBOARD_REGION: ${{ env.AWS_REGION }}
           DASHBOARD_CLUSTER: ${{ env.ECS_CLUSTER }}
@@ -424,8 +425,8 @@ jobs:
             --output text)
 
           if [ -z "$LOAD_BALANCER_ARN" ] || [ "$LOAD_BALANCER_ARN" = "None" ]; then
-            echo "::error::Unable to resolve ALB ARN from DNS name $DASHBOARD_ALB_DNS"
-            exit 1
+            echo "::warning::Skipping dashboard update: unable to resolve ALB ARN from DNS name $DASHBOARD_ALB_DNS"
+            exit 0
           fi
 
           export LOAD_BALANCER_DIMENSION=$(echo "$LOAD_BALANCER_ARN" | sed 's#.*loadbalancer/##')
