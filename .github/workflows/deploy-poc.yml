@@ -12,6 +12,7 @@ env:
   ECS_SERVICE: synapse-ops-service
   TASK_FAMILY: synapse-ops-task
   CONTAINER_NAME: synapse-ops
+  CLOUDWATCH_DASHBOARD_NAME: SynapseOps-ECS-POC
   ALB_DNS: synapse-ops-alb-1042958172.ap-south-1.elb.amazonaws.com
   TARGET_GROUP_ARN: arn:aws:elasticloadbalancing:ap-south-1:127214194014:targetgroup/synapse-ops-tg/d4f789c5757638a1
 
@@ -406,6 +407,64 @@ jobs:
 
             exit 1
           fi
+
+      - name: Upsert CloudWatch dashboard
+        env:
+          DASHBOARD_REGION: ${{ env.AWS_REGION }}
+          DASHBOARD_CLUSTER: ${{ env.ECS_CLUSTER }}
+          DASHBOARD_SERVICE: ${{ env.ECS_SERVICE }}
+          DASHBOARD_NAME: ${{ env.CLOUDWATCH_DASHBOARD_NAME }}
+          DASHBOARD_ALB_DNS: ${{ env.ALB_DNS }}
+          DASHBOARD_TARGET_GROUP_ARN: ${{ env.TARGET_GROUP_ARN }}
+        run: |
+          set -euo pipefail
+
+          LOAD_BALANCER_ARN=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?DNSName=='$DASHBOARD_ALB_DNS'].LoadBalancerArn | [0]" \
+            --output text)
+
+          if [ -z "$LOAD_BALANCER_ARN" ] || [ "$LOAD_BALANCER_ARN" = "None" ]; then
+            echo "::error::Unable to resolve ALB ARN from DNS name $DASHBOARD_ALB_DNS"
+            exit 1
+          fi
+
+          export LOAD_BALANCER_DIMENSION=$(echo "$LOAD_BALANCER_ARN" | sed 's#.*loadbalancer/##')
+          export TARGET_GROUP_DIMENSION=$(echo "$DASHBOARD_TARGET_GROUP_ARN" | sed 's#.*targetgroup/##')
+          export MONITORED_LOG_GROUP=$(jq -r '.containerDefinitions[0].environment[] | select(.name == "CLOUDWATCH_LOG_GROUP") | .value' ecs/task-definition.json)
+          export SYNAPSE_LOG_GROUP=$(jq -r '.containerDefinitions[0].logConfiguration.options["awslogs-group"]' ecs/task-definition.json)
+
+          python - <<'PY'
+import json
+import os
+from pathlib import Path
+
+template_path = Path("ecs/cloudwatch-dashboard.json.tpl")
+output_path = Path("/tmp/cloudwatch-dashboard.json")
+
+replacements = {
+    "__AWS_REGION__": os.environ["DASHBOARD_REGION"],
+    "__ECS_CLUSTER__": os.environ["DASHBOARD_CLUSTER"],
+    "__ECS_SERVICE__": os.environ["DASHBOARD_SERVICE"],
+    "__LOAD_BALANCER_DIMENSION__": os.environ["LOAD_BALANCER_DIMENSION"],
+    "__TARGET_GROUP_DIMENSION__": os.environ["TARGET_GROUP_DIMENSION"],
+    "__MONITORED_LOG_GROUP__": os.environ["MONITORED_LOG_GROUP"],
+    "__SYNAPSE_LOG_GROUP__": os.environ["SYNAPSE_LOG_GROUP"],
+}
+
+body = template_path.read_text(encoding="utf-8")
+for key, value in replacements.items():
+    body = body.replace(key, value)
+
+json.loads(body)
+output_path.write_text(body, encoding="utf-8")
+PY
+
+          aws cloudwatch put-dashboard \
+            --region "$DASHBOARD_REGION" \
+            --dashboard-name "$DASHBOARD_NAME" \
+            --dashboard-body file:///tmp/cloudwatch-dashboard.json
+
+          echo "Dashboard updated: $DASHBOARD_NAME"
 
   # ── Stage 4: Post-Deployment Validation ─────────────────────────────────
   post-deploy-validation:
