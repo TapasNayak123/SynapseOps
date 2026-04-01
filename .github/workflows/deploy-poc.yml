@@ -435,30 +435,30 @@ jobs:
           export SYNAPSE_LOG_GROUP=$(jq -r '.containerDefinitions[0].logConfiguration.options["awslogs-group"]' ecs/task-definition.json)
 
           python - <<'PY'
-import json
-import os
-from pathlib import Path
+            import json
+            import os
+            from pathlib import Path
 
-template_path = Path("ecs/cloudwatch-dashboard.json.tpl")
-output_path = Path("/tmp/cloudwatch-dashboard.json")
+            template_path = Path("ecs/cloudwatch-dashboard.json.tpl")
+            output_path = Path("/tmp/cloudwatch-dashboard.json")
 
-replacements = {
-    "__AWS_REGION__": os.environ["DASHBOARD_REGION"],
-    "__ECS_CLUSTER__": os.environ["DASHBOARD_CLUSTER"],
-    "__ECS_SERVICE__": os.environ["DASHBOARD_SERVICE"],
-    "__LOAD_BALANCER_DIMENSION__": os.environ["LOAD_BALANCER_DIMENSION"],
-    "__TARGET_GROUP_DIMENSION__": os.environ["TARGET_GROUP_DIMENSION"],
-    "__MONITORED_LOG_GROUP__": os.environ["MONITORED_LOG_GROUP"],
-    "__SYNAPSE_LOG_GROUP__": os.environ["SYNAPSE_LOG_GROUP"],
-}
+            replacements = {
+              "__AWS_REGION__": os.environ["DASHBOARD_REGION"],
+              "__ECS_CLUSTER__": os.environ["DASHBOARD_CLUSTER"],
+              "__ECS_SERVICE__": os.environ["DASHBOARD_SERVICE"],
+              "__LOAD_BALANCER_DIMENSION__": os.environ["LOAD_BALANCER_DIMENSION"],
+              "__TARGET_GROUP_DIMENSION__": os.environ["TARGET_GROUP_DIMENSION"],
+              "__MONITORED_LOG_GROUP__": os.environ["MONITORED_LOG_GROUP"],
+              "__SYNAPSE_LOG_GROUP__": os.environ["SYNAPSE_LOG_GROUP"],
+            }
 
-body = template_path.read_text(encoding="utf-8")
-for key, value in replacements.items():
-    body = body.replace(key, value)
+            body = template_path.read_text(encoding="utf-8")
+            for key, value in replacements.items():
+              body = body.replace(key, value)
 
-json.loads(body)
-output_path.write_text(body, encoding="utf-8")
-PY
+            json.loads(body)
+            output_path.write_text(body, encoding="utf-8")
+            PY
 
           aws cloudwatch put-dashboard \
             --region "$DASHBOARD_REGION" \
