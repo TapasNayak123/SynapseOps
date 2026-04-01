@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SynapseOps – AWS Architecture Document</title>
+  <style>
+    :root {
+      --aws-orange: #FF9900;
+      --aws-dark: #232F3E;
+      --aws-blue: #1A73E8;
+      --aws-light-blue: #4A90D9;
+      --bg-main: #0D1117;
+      --bg-card: #161B22;
+      --bg-card2: #1C2128;
+      --border: #30363D;
+      --text-main: #E6EDF3;
+      --text-muted: #8B949E;
+      --text-accent: #58A6FF;
+      --green: #3FB950;
+      --yellow: #D29922;
+      --red: #F85149;
+      --purple: #BC8CFF;
+      --teal: #39C5CF;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+      line-height: 1.6;
+    }
+
+    /* ──────────────────── HEADER ──────────────────── */
+    header {
+      background: linear-gradient(135deg, var(--aws-dark) 0%, #1A2332 60%, #0D1117 100%);
+      border-bottom: 3px solid var(--aws-orange);
+      padding: 48px 40px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,153,0,0.12) 0%, transparent 70%);
+    }
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,153,0,0.15);
+      border: 1px solid rgba(255,153,0,0.4);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      color: var(--aws-orange);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    header h1 {
+      font-size: 2.6rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    header h1 span { color: var(--aws-orange); }
+    header p.subtitle {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 700px;
+      margin-bottom: 28px;
+    }
+    .meta-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .meta-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .meta-pill strong { color: var(--text-main); }
+
+    /* ──────────────────── NAV ──────────────────── */
+    nav {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+    }
+    nav a {
+      display: block;
+      padding: 14px 18px;
+      text-decoration: none;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    nav a:hover { color: var(--text-main); border-bottom-color: var(--aws-orange); }
+
+    /* ──────────────────── LAYOUT ──────────────────── */
+    main { max-width: 1200px; margin: 0 auto; padding: 40px; }
+    section { margin-bottom: 60px; }
+    section h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    section h2 .section-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+
+    /* ──────────────────── OVERVIEW GRID ──────────────────── */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .overview-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: default;
+    }
+    .overview-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .overview-card .svc-icon {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      display: block;
+    }
+    .overview-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+    .overview-card p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .overview-card .tag {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .tag-runtime { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+    .tag-storage { background: rgba(88,166,255,0.15); color: var(--text-accent); border: 1px solid rgba(88,166,255,0.3); }
+    .tag-infra   { background: rgba(255,153,0,0.15);  color: var(--aws-orange); border: 1px solid rgba(255,153,0,0.3); }
+    .tag-ai      { background: rgba(188,140,255,0.15); color: var(--purple); border: 1px solid rgba(188,140,255,0.3); }
+    .tag-diag    { background: rgba(210,153,34,0.15);  color: var(--yellow); border: 1px solid rgba(210,153,34,0.3); }
+    .tag-network { background: rgba(57,197,207,0.15);  color: var(--teal); border: 1px solid rgba(57,197,207,0.3); }
+
+    /* ──────────────────── ARCHITECTURE DIAGRAM ──────────────────── */
+    .arch-diagram {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px;
+      overflow-x: auto;
+    }
+    .arch-diagram svg { display: block; margin: 0 auto; }
+
+    /* ──────────────────── SERVICE CARDS ──────────────────── */
+    .service-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .service-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .service-header .icon-box {
+      width: 52px; height: 52px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+    .service-header .title-group h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .service-header .title-group p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .service-body { padding: 24px; }
+    .service-body p { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; line-height: 1.7; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+    .info-block h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+    .file-list { list-style: none; }
+    .file-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 13px;
+      color: var(--text-accent);
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+    }
+    .file-list li:last-child { border-bottom: none; }
+    .file-list li .desc { color: var(--text-muted); font-size: 12px; margin-left: auto; text-align: right; max-width: 55%; }
+
+    /* ──────────────────── TABLES ──────────────────── */
+    .tbl-wrap { overflow-x: auto; margin-top: 20px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead tr { background: rgba(255,153,0,0.08); }
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--aws-orange);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid rgba(48,54,61,0.5); transition: background 0.15s; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody td { padding: 10px 14px; color: var(--text-muted); vertical-align: top; }
+    tbody td:first-child { color: var(--text-main); font-weight: 500; }
+    code {
+      background: rgba(255,153,0,0.1);
+      color: var(--aws-orange);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    /* ──────────────────── CONFIG BOX ──────────────────── */
+    .config-box {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-top: 20px;
+    }
+    .config-box h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .config-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(48,54,61,0.4);
+      gap: 12px;
+    }
+    .config-row:last-child { border-bottom: none; }
+    .config-row .key { color: var(--text-muted); font-size: 13px; flex-shrink: 0; }
+    .config-row .val { color: var(--text-accent); font-size: 12px; font-family: monospace; text-align: right; }
+
+    /* ──────────────────── TABLES (DynamoDB) ──────────────────── */
+    .dynamo-tables {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .dynamo-table-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .dynamo-table-card h5 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-accent);
+      margin-bottom: 8px;
+      font-family: monospace;
+    }
+    .dynamo-table-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    .dynamo-table-card .key-schema { font-size: 11px; color: var(--text-muted); line-height: 1.8; }
+    .dynamo-table-card .key-schema span { color: var(--yellow); }
+
+    /* ──────────────────── ROLE CARDS ──────────────────── */
+    .role-cards { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .role-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .role-card .role-icon {
+      width: 36px; height: 36px;
+      background: rgba(255,153,0,0.12);
+      border: 1px solid rgba(255,153,0,0.3);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .role-card h5 { font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
+    .role-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    .role-card code { font-size: 11px; word-break: break-all; }
+
+    /* ──────────────────── DATA FLOW ──────────────────── */
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-top: 16px;
+      position: relative;
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px 0;
+      position: relative;
+    }
+    .flow-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 19px;
+      top: 52px;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--border), transparent);
+    }
+    .step-num {
+      width: 40px; height: 40px;
+      background: rgba(255,153,0,0.15);
+      border: 2px solid rgba(255,153,0,0.5);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--aws-orange);
+      flex-shrink: 0;
+    }
+    .step-content h5 { font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
+    .step-content p { font-size: 13px; color: var(--text-muted); }
+    .step-services {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .step-svc {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(74,144,217,0.12);
+      color: var(--aws-light-blue);
+      border: 1px solid rgba(74,144,217,0.25);
+      font-weight: 500;
+    }
+
+    /* ──────────────────── SUMMARY TABLE ──────────────────── */
+    .summary-table-wrap { overflow-x: auto; }
+
+    /* ──────────────────── FOOTER ──────────────────── */
+    footer {
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      padding: 28px 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    footer strong { color: var(--aws-orange); }
+
+    /* ──────────────────── SCROLL SMOOTH ──────────────────── */
+    html { scroll-behavior: smooth; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ HEADER ═══════════════════════ -->
+<header>
+  <div class="header-badge">
+    <span>☁</span> AWS Architecture Document
+  </div>
+  <h1><span>SynapseOps</span> — AWS Services Architecture</h1>
+  <p class="subtitle">
+    Comprehensive reference for all Amazon Web Services integrated into the SynapseOps AI-powered DevOps intelligence platform.
+  </p>
+  <div class="meta-pills">
+    <div class="meta-pill">📅 <strong>Date:</strong>&nbsp;March 25, 2026</div>
+    <div class="meta-pill">🔢 <strong>AWS Services:</strong>&nbsp;9</div>
+    <div class="meta-pill">🌎 <strong>Regions:</strong>&nbsp;us-east-1, ap-south-1</div>
+    <div class="meta-pill">🐍 <strong>SDK:</strong>&nbsp;boto3 (Python)</div>
+    <div class="meta-pill">🚀 <strong>Deployments:</strong>&nbsp;ECS Fargate · EKS</div>
+  </div>
+</header>
+
+<!-- ═══════════════════════ NAV ═══════════════════════ -->
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#architecture">Architecture Diagram</a>
+  <a href="#bedrock">Bedrock</a>
+  <a href="#cloudwatch">CloudWatch</a>
+  <a href="#dynamodb">DynamoDB</a>
+  <a href="#ecs">ECS / Fargate</a>
+  <a href="#eks">EKS</a>
+  <a href="#ecr">ECR</a>
+  <a href="#iam">IAM</a>
+  <a href="#alb">ALB / ELB</a>
+  <a href="#sts">STS</a>
+  <a href="#data-flow">Data Flow</a>
+  <a href="#summary">Summary</a>
+</nav>
+
+<!-- ═══════════════════════ MAIN ═══════════════════════ -->
+<main>
+
+  <!-- ── OVERVIEW ── -->
+  <section id="overview">
+    <h2>
+      <span class="section-icon" style="background:rgba(255,153,0,0.15);">🗺</span>
+      Service Overview
+    </h2>
+    <div class="overview-grid">
+      <div class="overview-card">
+        <span class="svc-icon">🤖</span>
+        <h3>Amazon Bedrock</h3>
+        <p>Generative AI / LLM Engine</p>
+        <span class="tag tag-ai">AI / ML</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">📋</span>
+        <h3>CloudWatch Logs</h3>
+        <p>Log Ingestion &amp; Insights Queries</p>
+        <span class="tag tag-runtime">Monitoring</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">🗄</span>
+        <h3>DynamoDB</h3>
+        <p>Persistent State &amp; Audit Store</p>
+        <span class="tag tag-storage">Storage</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">📦</span>
+        <h3>ECS / Fargate</h3>
+        <p>Serverless Container Runtime</p>
+        <span class="tag tag-infra">Infra</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">⚓</span>
+        <h3>EKS</h3>
+        <p>Managed Kubernetes Cluster</p>
+        <span class="tag tag-infra">Infra</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">🏗</span>
+        <h3>ECR</h3>
+        <p>Container Image Registry</p>
+        <span class="tag tag-infra">Infra</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">🔐</span>
+        <h3>IAM</h3>
+        <p>Roles, Policies &amp; IRSA</p>
+        <span class="tag tag-infra">Security</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">⚖</span>
+        <h3>ALB / ELB</h3>
+        <p>Application Load Balancer</p>
+        <span class="tag tag-network">Network</span>
+      </div>
+      <div class="overview-card">
+        <span class="svc-icon">🪪</span>
+        <h3>STS</h3>
+        <p>Credential Verification</p>
+        <span class="tag tag-diag">Diagnostic</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ARCHITECTURE DIAGRAM ── -->
+  <section id="architecture">
+    <h2>
+      <span class="section-icon" style="background:rgba(74,144,217,0.15);">🏛</span>
+      Architecture Diagram
+    </h2>
+    <div class="arch-diagram">
+      <svg width="1080" height="680" viewBox="0 0 1080 680" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,system-ui,sans-serif">
+        <defs>
+          <linearGradient id="bg-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1C2128"/>
+            <stop offset="100%" stop-color="#161B22"/>
+          </linearGradient>
+          <linearGradient id="orange-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FF9900"/>
+            <stop offset="100%" stop-color="#E3820B"/>
+          </linearGradient>
+          <linearGradient id="blue-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4A90D9"/>
+            <stop offset="100%" stop-color="#2563AE"/>
+          </linearGradient>
+          <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.4"/>
+          </filter>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#4A90D9" opacity="0.7"/>
+          </marker>
+          <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#FF9900" opacity="0.7"/>
+          </marker>
+        </defs>
+
+        <!-- background -->
+        <rect width="1080" height="680" rx="12" fill="url(#bg-grad)"/>
+
+        <!-- AWS Cloud boundary -->
+        <rect x="20" y="20" width="1040" height="640" rx="10" fill="none" stroke="#FF9900" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.3"/>
+        <text x="36" y="48" fill="#FF9900" font-size="12" font-weight="600" opacity="0.5">AWS Cloud</text>
+
+        <!-- ── INTERNET / USERS ── -->
+        <rect x="460" y="30" width="160" height="56" rx="10" fill="#1E3A5F" stroke="#4A90D9" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="540" y="56" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">👤 Users / GitHub</text>
+        <text x="540" y="75" fill="#8B949E" font-size="11" text-anchor="middle">Webhooks · API Calls</text>
+
+        <!-- ── ALB ── -->
+        <rect x="440" y="130" width="200" height="52" rx="10" fill="#1A2D20" stroke="#3FB950" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="540" y="155" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">⚖ Application Load Balancer</text>
+        <text x="540" y="172" fill="#8B949E" font-size="11" text-anchor="middle">ALB · ECS &amp; EKS endpoints</text>
+
+        <!-- arrow: users → ALB -->
+        <line x1="540" y1="86" x2="540" y2="129" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+        <!-- ── ECS BOX ── -->
+        <rect x="60" y="240" width="240" height="80" rx="10" fill="#1E2A1E" stroke="#3FB950" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="180" y="271" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">📦 ECS / Fargate</text>
+        <text x="180" y="288" fill="#8B949E" font-size="11" text-anchor="middle">synapse-ops-task</text>
+        <text x="180" y="305" fill="#8B949E" font-size="11" text-anchor="middle">ap-south-1 · 512 vCPU · 1GB</text>
+
+        <!-- ── EKS BOX ── -->
+        <rect x="780" y="240" width="240" height="80" rx="10" fill="#1A2A38" stroke="#4A90D9" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="900" y="271" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">⚓ EKS / Kubernetes</text>
+        <text x="900" y="288" fill="#8B949E" font-size="11" text-anchor="middle">synapse-ops Helm Chart</text>
+        <text x="900" y="305" fill="#8B949E" font-size="11" text-anchor="middle">us-east-1 · IRSA enabled</text>
+
+        <!-- arrows ALB → ECS -->
+        <line x1="440" y1="160" x2="300" y2="240" stroke="#3FB950" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- arrows ALB → EKS -->
+        <line x1="640" y1="160" x2="780" y2="240" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+        <!-- ── ECR ── -->
+        <rect x="430" y="240" width="220" height="80" rx="10" fill="#252025" stroke="#BC8CFF" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="540" y="271" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">🏗 ECR</text>
+        <text x="540" y="288" fill="#8B949E" font-size="11" text-anchor="middle">Container Image Registry</text>
+        <text x="540" y="305" fill="#8B949E" font-size="11" text-anchor="middle">synapse-ops:latest</text>
+
+        <!-- arrows ECR → ECS/EKS -->
+        <line x1="430" y1="280" x2="300" y2="280" stroke="#BC8CFF" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <line x1="650" y1="280" x2="780" y2="280" stroke="#BC8CFF" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+        <!-- ── BEDROCK ── -->
+        <rect x="60" y="420" width="200" height="80" rx="10" fill="#1E1E35" stroke="#BC8CFF" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="160" y="450" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">🤖 Amazon Bedrock</text>
+        <text x="160" y="467" fill="#8B949E" font-size="11" text-anchor="middle">claude-3-haiku</text>
+        <text x="160" y="484" fill="#8B949E" font-size="11" text-anchor="middle">invoke_model API</text>
+
+        <!-- ── CLOUDWATCH ── -->
+        <rect x="290" y="420" width="200" height="80" rx="10" fill="#1A2A20" stroke="#3FB950" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="390" y="450" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">📋 CloudWatch Logs</text>
+        <text x="390" y="467" fill="#8B949E" font-size="11" text-anchor="middle">Logs Insights Queries</text>
+        <text x="390" y="484" fill="#8B949E" font-size="11" text-anchor="middle">start_query · get_query_results</text>
+
+        <!-- ── DYNAMODB ── -->
+        <rect x="520" y="420" width="200" height="80" rx="10" fill="#1A2030" stroke="#58A6FF" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="620" y="450" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">🗄 DynamoDB</text>
+        <text x="620" y="467" fill="#8B949E" font-size="11" text-anchor="middle">6 tables · PAY_PER_REQUEST</text>
+        <text x="620" y="484" fill="#8B949E" font-size="11" text-anchor="middle">put_item · query · scan</text>
+
+        <!-- ── IAM ── -->
+        <rect x="750" y="420" width="180" height="80" rx="10" fill="#251A1A" stroke="#F85149" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="840" y="450" fill="#E6EDF3" font-size="13" font-weight="600" text-anchor="middle">🔐 IAM</text>
+        <text x="840" y="467" fill="#8B949E" font-size="11" text-anchor="middle">Execution / Task Roles</text>
+        <text x="840" y="484" fill="#8B949E" font-size="11" text-anchor="middle">IRSA for EKS pods</text>
+
+        <!-- ── STS ── -->
+        <rect x="960" y="420" width="100" height="80" rx="10" fill="#252018" stroke="#D29922" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="1010" y="450" fill="#E6EDF3" font-size="12" font-weight="600" text-anchor="middle">🪪 STS</text>
+        <text x="1010" y="468" fill="#8B949E" font-size="10" text-anchor="middle">get_caller</text>
+        <text x="1010" y="483" fill="#8B949E" font-size="10" text-anchor="middle">_identity</text>
+
+        <!-- arrows ECS/EKS → services -->
+        <!-- ECS → Bedrock -->
+        <line x1="160" y1="320" x2="160" y2="419" stroke="#BC8CFF" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- ECS → CloudWatch -->
+        <line x1="210" y1="320" x2="350" y2="419" stroke="#3FB950" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- ECS → DynamoDB -->
+        <line x1="250" y1="320" x2="560" y2="419" stroke="#58A6FF" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- EKS → CloudWatch -->
+        <line x1="800" y1="320" x2="450" y2="419" stroke="#3FB950" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- EKS → DynamoDB -->
+        <line x1="830" y1="320" x2="680" y2="419" stroke="#58A6FF" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- EKS → IAM -->
+        <line x1="870" y1="320" x2="840" y2="419" stroke="#F85149" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- Bedrock → DynamoDB (audit pipe) -->
+        <line x1="260" y1="460" x2="519" y2="460" stroke="#4A90D9" stroke-width="1" stroke-dasharray="3,3" opacity="0.5" marker-end="url(#arrow)"/>
+
+        <!-- ── legend ── -->
+        <rect x="36" y="575" width="360" height="86" rx="8" fill="rgba(255,255,255,0.03)" stroke="#30363D" stroke-width="1"/>
+        <text x="56" y="596" fill="#8B949E" font-size="11" font-weight="600">LEGEND</text>
+        <line x1="56" y1="610" x2="90" y2="610" stroke="#3FB950" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="96" y="614" fill="#8B949E" font-size="11">Container / Compute</text>
+        <line x1="56" y1="628" x2="90" y2="628" stroke="#58A6FF" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="96" y="632" fill="#8B949E" font-size="11">Storage / Database</text>
+        <line x1="56" y1="646" x2="90" y2="646" stroke="#BC8CFF" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="96" y="650" fill="#8B949E" font-size="11">AI / Registry / Auth</text>
+        <line x1="200" y1="610" x2="234" y2="610" stroke="#F85149" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="240" y="614" fill="#8B949E" font-size="11">Security / IAM</text>
+        <line x1="200" y1="628" x2="234" y2="628" stroke="#D29922" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="240" y="632" fill="#8B949E" font-size="11">Diagnostic</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       SERVICE DEEP-DIVES
+  ══════════════════════════════════ -->
+
+  <!-- ── 1. BEDROCK ── -->
+  <section id="bedrock">
+    <h2>
+      <span class="section-icon" style="background:rgba(188,140,255,0.15);">🤖</span>
+      1 · Amazon Bedrock
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(188,140,255,0.15);">🤖</div>
+        <div class="title-group">
+          <h3>Amazon Bedrock <code>bedrock-runtime</code></h3>
+          <p>Core AI/LLM engine — powers all intelligent analysis across the platform</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          Amazon Bedrock is the AI backbone of SynapseOps. Every intelligent feature — root-cause analysis,
+          auto-fix code generation, performance optimization suggestions, incident summarization, and the
+          conversational DevOps chat — ultimately calls Bedrock's <code>invoke_model</code> API.
+          The platform is model-agnostic and auto-detects the provider from the model ID to format
+          the correct request/response schema.
+        </p>
+        <div class="two-col">
+          <div class="info-block">
+            <h4>Source Files</h4>
+            <ul class="file-list">
+              <li>📄 <span>app/services/llm.py</span> <span class="desc">Singleton LLM client, all invocations</span></li>
+              <li>📄 <span>bedrock_client.py</span> <span class="desc">Root-level re-export wrapper</span></li>
+              <li>📄 <span>diagnose.py</span> <span class="desc">Connectivity diagnostic check</span></li>
+              <li>📄 <span>app/services/auto_fix.py</span> <span class="desc">Code fix generation</span></li>
+              <li>📄 <span>app/services/chat_engine.py</span> <span class="desc">Conversational chat</span></li>
+              <li>📄 <span>app/services/performance.py</span> <span class="desc">Optimization suggestions</span></li>
+            </ul>
+          </div>
+          <div class="info-block">
+            <h4>Supported Models</h4>
+            <div class="tbl-wrap">
+              <table>
+                <thead>
+                  <tr><th>Provider</th><th>Request Format</th><th>Response Field</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>anthropic.*</td><td>messages[] + anthropic_version</td><td>content[0].text</td></tr>
+                  <tr><td>nova.*</td><td>messages[] + inferenceConfig</td><td>output.message.content[0].text</td></tr>
+                  <tr><td>meta.*</td><td>prompt + max_gen_len</td><td>generation</td></tr>
+                  <tr><td>default</td><td>Nova-style Converse</td><td>output.message…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="tbl-wrap" style="margin-top:20px;">
+          <table>
+            <thead><tr><th>API Operation</th><th>boto3 Client</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td>invoke_model</td><td><code>bedrock-runtime</code></td><td>Send prompt body, receive LLM completion</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-box">
+          <h4>Configuration</h4>
+          <div class="config-row"><span class="key">BEDROCK_MODEL_ID (default)</span><span class="val">anthropic.claude-3-haiku-20240307-v1:0</span></div>
+          <div class="config-row"><span class="key">BEDROCK_REGION (default)</span><span class="val">us-east-1</span></div>
+          <div class="config-row"><span class="key">BEDROCK_REGION (ECS)</span><span class="val">ap-south-1</span></div>
+          <div class="config-row"><span class="key">BEDROCK_REGION (EKS/Helm)</span><span class="val">us-east-1</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 2. CLOUDWATCH ── -->
+  <section id="cloudwatch">
+    <h2>
+      <span class="section-icon" style="background:rgba(63,185,80,0.15);">📋</span>
+      2 · Amazon CloudWatch Logs
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(63,185,80,0.15);">📋</div>
+        <div class="title-group">
+          <h3>Amazon CloudWatch Logs <code>logs</code></h3>
+          <p>Primary data source — all API health, latency, traffic &amp; error metrics are derived from CloudWatch</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          CloudWatch Logs is the primary observability data source for SynapseOps. The platform ingests
+          structured application logs and runs CloudWatch Logs Insights queries to compute error rates,
+          latency percentiles, traffic patterns, recurring errors, and incident timelines. A two-path
+          design is used: Logs Insights first (preferred, has up to 30-minute indexing delay); if results
+          are empty, a direct stream scan via <code>describe_log_streams</code> + <code>get_log_events</code>
+          is used as a fallback.
+        </p>
+        <div class="two-col">
+          <div class="info-block">
+            <h4>Source Files</h4>
+            <ul class="file-list">
+              <li>📄 <span>app/services/cloudwatch.py</span> <span class="desc">Core CloudWatchService class</span></li>
+              <li>📄 <span>app/services/log_analyzer.py</span> <span class="desc">Thin wrapper</span></li>
+              <li>📄 <span>app/services/error_analyzer.py</span> <span class="desc">Error rate monitoring</span></li>
+              <li>📄 <span>app/services/performance.py</span> <span class="desc">Latency / top APIs</span></li>
+              <li>📄 <span>app/services/incident_analyzer.py</span> <span class="desc">Incident timelines</span></li>
+              <li>📄 <span>app/services/sla_tracker.py</span> <span class="desc">SLA compliance</span></li>
+              <li>📄 <span>app/services/deployment_gate.py</span> <span class="desc">Pre-deploy traffic analysis</span></li>
+              <li>📄 <span>ecs/task-definition.json</span> <span class="desc">awslogs driver for app container</span></li>
+            </ul>
+          </div>
+          <div class="info-block">
+            <h4>APIs Called</h4>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Operation</th><th>Purpose</th></tr></thead>
+                <tbody>
+                  <tr><td>start_query</td><td>Launch CloudWatch Logs Insights query</td></tr>
+                  <tr><td>get_query_results</td><td>Poll until query complete</td></tr>
+                  <tr><td>describe_log_streams</td><td>List recent streams (fallback)</td></tr>
+                  <tr><td>get_log_events</td><td>Read raw events from stream (fallback)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="config-box" style="margin-top:20px;">
+          <h4>Dynamic Insights Queries (examples)</h4>
+          <div class="config-row"><span class="key">Error Rate</span><span class="val">stats count(*) as total, sum(statusCode >= 500) as errors</span></div>
+          <div class="config-row"><span class="key">Latency Percentiles</span><span class="val">stats avg(d), max(d), pct(d, 99) as p99</span></div>
+          <div class="config-row"><span class="key">Top APIs by Traffic</span><span class="val">stats count(*) as total by path | sort total desc</span></div>
+          <div class="config-row"><span class="key">Incident Logs</span><span class="val">filter level="error" or statusCode >= 400 | sort @timestamp asc</span></div>
+          <div class="config-row"><span class="key">Recurring Errors (7d)</span><span class="val">Correlation ID tracing window</span></div>
+        </div>
+
+        <div class="config-box">
+          <h4>Configuration</h4>
+          <div class="config-row"><span class="key">CLOUDWATCH_LOG_GROUP (default)</span><span class="val">/your/service/log-group</span></div>
+          <div class="config-row"><span class="key">CLOUDWATCH_LOG_GROUP (ECS)</span><span class="val">/ecs/auth-api-poc</span></div>
+          <div class="config-row"><span class="key">CLOUDWATCH_LOG_GROUP (EKS)</span><span class="val">/aws/eks/auth-api</span></div>
+          <div class="config-row"><span class="key">App's own logs (ECS awslogs)</span><span class="val">/ecs/synapse-ops</span></div>
+          <div class="config-row"><span class="key">AWS_REGION</span><span class="val">us-east-1 (default) · ap-south-1 (ECS)</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 3. DYNAMODB ── -->
+  <section id="dynamodb">
+    <h2>
+      <span class="section-icon" style="background:rgba(88,166,255,0.15);">🗄</span>
+      3 · Amazon DynamoDB
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(88,166,255,0.15);">🗄</div>
+        <div class="title-group">
+          <h3>Amazon DynamoDB <code>dynamodb</code> resource</h3>
+          <p>Persistent state store — alerts, metrics history, audit logs, PR &amp; pipeline records, deployment gates</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          DynamoDB provides durable, serverless persistence for all operational state in SynapseOps.
+          Tables are automatically created on first startup (<code>BillingMode: PAY_PER_REQUEST</code>)
+          with a composite key design (<code>pk</code> = partition key, <code>sk</code> = ISO timestamp sort key).
+          Every alert, metric snapshot, auto-fix action, PR analysis result, pipeline run, and deployment
+          gate event is persisted here and survives application restarts.
+        </p>
+
+        <div class="two-col">
+          <div class="info-block">
+            <h4>Source Files</h4>
+            <ul class="file-list">
+              <li>📄 <span>app/services/dynamodb.py</span> <span class="desc">DynamoDBService — core tables</span></li>
+              <li>📄 <span>app/services/deployment_gate.py</span> <span class="desc">held-deployments table</span></li>
+              <li>📄 <span>store.py</span> <span class="desc">PRStore + PipelineStore; auto-create</span></li>
+              <li>📄 <span>activity_log.py</span> <span class="desc">Audit table reads/writes</span></li>
+            </ul>
+          </div>
+          <div class="info-block">
+            <h4>APIs Called</h4>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Operation</th><th>Purpose</th></tr></thead>
+                <tbody>
+                  <tr><td>put_item</td><td>Store alerts, metrics, logs, records</td></tr>
+                  <tr><td>query</td><td>Retrieve by pk, sorted by sk (timestamp)</td></tr>
+                  <tr><td>scan</td><td>Full-table for audit logs, held deployments</td></tr>
+                  <tr><td>create_table</td><td>Auto-create on first run</td></tr>
+                  <tr><td>wait_until_exists</td><td>Block until table is active</td></tr>
+                  <tr><td>table_status</td><td>Health check / existence probe</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <h4 style="margin-top:24px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:600;">Tables (prefix: <code>synapse-ops</code>)</h4>
+        <div class="dynamo-tables">
+          <div class="dynamo-table-card">
+            <h5>synapse-ops-alerts</h5>
+            <p>Threshold breach alerts per API path</p>
+            <div class="key-schema">
+              <span>PK:</span> ALERT#{api_path}<br/>
+              <span>SK:</span> ISO timestamp
+            </div>
+          </div>
+          <div class="dynamo-table-card">
+            <h5>synapse-ops-metrics</h5>
+            <p>Metric snapshots for trend analysis</p>
+            <div class="key-schema">
+              <span>PK:</span> METRIC#{api_path}<br/>
+              <span>SK:</span> ISO timestamp
+            </div>
+          </div>
+          <div class="dynamo-table-card">
+            <h5>synapse-ops-audit</h5>
+            <p>Auto-fix history, SLA checks, activity log</p>
+            <div class="key-schema">
+              <span>PK:</span> AUDIT#{action}<br/>
+              <span>SK:</span> ISO timestamp
+            </div>
+          </div>
+          <div class="dynamo-table-card">
+            <h5>synapse-ops-held-deployments</h5>
+            <p>Deployments blocked by deployment gate</p>
+            <div class="key-schema">
+              <span>PK:</span> repo<br/>
+              <span>SK:</span> run_id
+            </div>
+          </div>
+          <div class="dynamo-table-card">
+            <h5>synapse-ops-pr-records</h5>
+            <p>PR analysis results per repository</p>
+            <div class="key-schema">
+              <span>PK:</span> repo<br/>
+              <span>SK:</span> {pr_number}#{timestamp}
+            </div>
+          </div>
+          <div class="dynamo-table-card">
+            <h5>synapse-ops-pipeline-records</h5>
+            <p>CI/CD pipeline run results</p>
+            <div class="key-schema">
+              <span>PK:</span> repo<br/>
+              <span>SK:</span> {run_id}#{timestamp}
+            </div>
+          </div>
+        </div>
+
+        <div class="config-box" style="margin-top:20px;">
+          <h4>Configuration</h4>
+          <div class="config-row"><span class="key">DYNAMODB_TABLE_PREFIX</span><span class="val">synapse-ops (default)</span></div>
+          <div class="config-row"><span class="key">BillingMode</span><span class="val">PAY_PER_REQUEST (on-demand)</span></div>
+          <div class="config-row"><span class="key">AWS_REGION</span><span class="val">us-east-1 (default) · ap-south-1 (ECS)</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 4. ECS ── -->
+  <section id="ecs">
+    <h2>
+      <span class="section-icon" style="background:rgba(63,185,80,0.15);">📦</span>
+      4 · Amazon ECS / Fargate
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(63,185,80,0.15);">📦</div>
+        <div class="title-group">
+          <h3>Amazon ECS / Fargate</h3>
+          <p>Serverless container deployment for SynapseOps in ap-south-1</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          ECS Fargate is one of two production deployment targets. The task definition specifies a
+          Fargate launch type with <code>awsvpc</code> networking, exposing port 5000. Application
+          container logs are shipped directly to CloudWatch Logs via the <code>awslogs</code> driver.
+          A Python-based health check polls <code>/health</code> every 30 seconds.
+        </p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Task Family</td><td><code>synapse-ops-task</code></td></tr>
+              <tr><td>Launch Type</td><td>FARGATE</td></tr>
+              <tr><td>Network Mode</td><td>awsvpc</td></tr>
+              <tr><td>CPU / Memory</td><td>512 vCPU units / 1024 MB</td></tr>
+              <tr><td>Region</td><td>ap-south-1</td></tr>
+              <tr><td>Container Image</td><td><code>127214194014.dkr.ecr.ap-south-1.amazonaws.com/synapse-ops:latest</code></td></tr>
+              <tr><td>Exposed Port</td><td>5000/tcp</td></tr>
+              <tr><td>Log Driver</td><td>awslogs → <code>/ecs/synapse-ops</code>, ap-south-1</td></tr>
+              <tr><td>Health Check</td><td>python -c "urllib.request.urlopen('http://localhost:5000/health')"</td></tr>
+              <tr><td>Source File</td><td><code>ecs/task-definition.json</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="config-box" style="margin-top:20px;">
+          <h4>Execution Role</h4>
+          <div class="config-row"><span class="key">Execution Role ARN</span><span class="val">arn:aws:iam::127214194014:role/synapse-ops-ecs-execution-role</span></div>
+          <div class="config-row"><span class="key">Purpose</span><span class="val">Pull ECR images, write CloudWatch Logs</span></div>
+          <div class="config-row"><span class="key">Task Role ARN</span><span class="val">arn:aws:iam::127214194014:role/synapse-ops-ecs-task-role</span></div>
+          <div class="config-row"><span class="key">Purpose</span><span class="val">Runtime access: Bedrock, DynamoDB, CloudWatch</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 5. EKS ── -->
+  <section id="eks">
+    <h2>
+      <span class="section-icon" style="background:rgba(74,144,217,0.15);">⚓</span>
+      5 · Amazon EKS
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(74,144,217,0.15);">⚓</div>
+        <div class="title-group">
+          <h3>Amazon EKS (Elastic Kubernetes Service)</h3>
+          <p>Primary production deployment platform via Helm chart; also queried at runtime via kubectl</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          EKS is the primary production target for SynapseOps. The Helm chart in <code>helm/synapse-ops/</code>
+          defines the Kubernetes deployment, service, and IRSA service account. At runtime, the
+          <code>K8sClient</code> service runs <code>kubectl</code> shell commands to query live cluster state
+          for pod health, node resource usage, service endpoints, and deployment rollout status.
+        </p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>kubectl Command</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>kubectl get pods -n default -o json</code></td><td>Pod status and container states</td></tr>
+              <tr><td><code>kubectl top nodes --no-headers</code></td><td>Node CPU/memory usage</td></tr>
+              <tr><td><code>kubectl top pods -n default --no-headers</code></td><td>Per-pod CPU/memory usage</td></tr>
+              <tr><td><code>kubectl get services -n default -o json</code></td><td>Service list and external endpoints</td></tr>
+              <tr><td><code>kubectl get deployments -n default -o json</code></td><td>Deployment rollout status</td></tr>
+              <tr><td><code>kubectl cluster-info</code></td><td>Cluster endpoint info</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-box" style="margin-top:20px;">
+          <h4>Helm &amp; Cluster Configuration</h4>
+          <div class="config-row"><span class="key">Chart Source</span><span class="val">helm/synapse-ops/</span></div>
+          <div class="config-row"><span class="key">Deployment Script</span><span class="val">redeploy.sh (aws eks update-kubeconfig)</span></div>
+          <div class="config-row"><span class="key">IRSA Service Account</span><span class="val">synapse-ops-sa</span></div>
+          <div class="config-row"><span class="key">IRSA Role ARN</span><span class="val">arn:aws:iam::551494044780:role/synapse-ops-role</span></div>
+          <div class="config-row"><span class="key">K8sClient Source</span><span class="val">app/services/k8s_client.py</span></div>
+          <div class="config-row"><span class="key">ALB Endpoint</span><span class="val">k8s-default-synapseo-c24cd86152-c2217fb71b44965d.elb.us-east-1.amazonaws.com</span></div>
+          <div class="config-row"><span class="key">Region</span><span class="val">us-east-1</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 6. ECR ── -->
+  <section id="ecr">
+    <h2>
+      <span class="section-icon" style="background:rgba(188,140,255,0.15);">🏗</span>
+      6 · Amazon ECR
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(188,140,255,0.15);">🏗</div>
+        <div class="title-group">
+          <h3>Amazon ECR (Elastic Container Registry)</h3>
+          <p>Private Docker image registry for both ECS Fargate and EKS deployments</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          ECR hosts the <code>synapse-ops</code> Docker container image. Two separate ECR repositories
+          are used — one per deployment region. The ECS execution role is granted pull access; the
+          EKS nodes pull via the node IAM role.
+        </p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Deployment</th><th>Account ID</th><th>Region</th><th>Image URI</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>ECS / Fargate</td>
+                <td><code>127214194014</code></td>
+                <td>ap-south-1</td>
+                <td><code>127214194014.dkr.ecr.ap-south-1.amazonaws.com/synapse-ops:latest</code></td>
+              </tr>
+              <tr>
+                <td>EKS / Helm</td>
+                <td><code>551494044780</code></td>
+                <td>us-east-1</td>
+                <td><code>551494044780.dkr.ecr.us-east-1.amazonaws.com/synapse-ops:latest</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 7. IAM ── -->
+  <section id="iam">
+    <h2>
+      <span class="section-icon" style="background:rgba(248,81,73,0.15);">🔐</span>
+      7 · AWS IAM
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(248,81,73,0.15);">🔐</div>
+        <div class="title-group">
+          <h3>AWS IAM — Roles &amp; IRSA</h3>
+          <p>Least-privilege roles for ECS task execution, ECS runtime, and EKS pod-level AWS access</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          Three IAM roles underpin SynapseOps security. ECS uses two separate roles following the
+          principle of least privilege: one for control-plane operations (image pull, log shipping) and
+          one for data-plane runtime API calls. EKS uses IAM Roles for Service Accounts (IRSA), binding
+          a Kubernetes service account to an IAM role via OIDC federation.
+        </p>
+        <div class="role-cards">
+          <div class="role-card">
+            <div class="role-icon">🎬</div>
+            <div>
+              <h5>ECS Execution Role</h5>
+              <p>Used by the ECS control plane to pull the Docker image from ECR and ship container logs to CloudWatch Logs.</p>
+              <code>arn:aws:iam::127214194014:role/synapse-ops-ecs-execution-role</code>
+            </div>
+          </div>
+          <div class="role-card">
+            <div class="role-icon">⚙</div>
+            <div>
+              <h5>ECS Task Role</h5>
+              <p>Assumed by the running container at runtime. Grants access to Bedrock (<code>invoke_model</code>), DynamoDB (CRUD), and CloudWatch Logs Insights.</p>
+              <code>arn:aws:iam::127214194014:role/synapse-ops-ecs-task-role</code>
+            </div>
+          </div>
+          <div class="role-card">
+            <div class="role-icon">⚓</div>
+            <div>
+              <h5>EKS IRSA Role</h5>
+              <p>Federated via OIDC to the <code>synapse-ops-sa</code> Kubernetes service account. Provides EKS pods with the same AWS API access as the ECS task role.</p>
+              <code>arn:aws:iam::551494044780:role/synapse-ops-role</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 8. ALB ── -->
+  <section id="alb">
+    <h2>
+      <span class="section-icon" style="background:rgba(57,197,207,0.15);">⚖</span>
+      8 · Application Load Balancer (ALB/ELB)
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(57,197,207,0.15);">⚖</div>
+        <div class="title-group">
+          <h3>Elastic Load Balancing (ALB/ELB)</h3>
+          <p>Internet-facing load balancer fronting both ECS and EKS deployments</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          An AWS Application Load Balancer (auto-provisioned by AWS) provides the public internet-facing
+          entry point for SynapseOps. On ECS it is provisioned as part of the ECS service configuration;
+          on EKS it is provisioned by the Kubernetes Service of type <code>LoadBalancer</code> defined
+          in the Helm chart (<code>helm/synapse-ops/values.yaml</code>).
+        </p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Deployment</th><th>Public Endpoint</th><th>Region</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>ECS / Fargate</td>
+                <td><code>synapse-ops-alb-1042958172.ap-south-1.elb.amazonaws.com</code></td>
+                <td>ap-south-1</td>
+              </tr>
+              <tr>
+                <td>EKS / Helm</td>
+                <td><code>k8s-default-synapseo-c24cd86152-c2217fb71b44965d.elb.us-east-1.amazonaws.com</code></td>
+                <td>us-east-1</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 9. STS ── -->
+  <section id="sts">
+    <h2>
+      <span class="section-icon" style="background:rgba(210,153,34,0.15);">🪪</span>
+      9 · AWS STS (Security Token Service)
+    </h2>
+    <div class="service-card">
+      <div class="service-header">
+        <div class="icon-box" style="background:rgba(210,153,34,0.15);">🪪</div>
+        <div class="title-group">
+          <h3>AWS STS — Security Token Service</h3>
+          <p>Used exclusively in the diagnostic script to verify AWS credentials are correctly configured</p>
+        </div>
+      </div>
+      <div class="service-body">
+        <p>
+          STS is used only in <code>diagnose.py</code> as part of the AWS connectivity check.
+          It calls <code>get_caller_identity</code> to confirm that valid AWS credentials are present,
+          and prints the account ID and caller ARN for verification. This is not part of the
+          main application runtime path.
+        </p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>API Operation</th><th>boto3 Client</th><th>Purpose</th><th>File</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>get_caller_identity</td>
+                <td><code>sts</code></td>
+                <td>Verify AWS credentials, print Account ID &amp; ARN</td>
+                <td><code>diagnose.py</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DATA FLOW ── -->
+  <section id="data-flow">
+    <h2>
+      <span class="section-icon" style="background:rgba(255,153,0,0.15);">🔄</span>
+      End-to-End Data Flow
+    </h2>
+    <div class="service-card">
+      <div class="service-body">
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h5>User Request / GitHub Webhook Arrives</h5>
+              <p>A user opens the dashboard or GitHub fires a webhook (PR opened, pipeline run completed). The request hits the internet-facing load balancer.</p>
+              <div class="step-services"><span class="step-svc">ALB / ELB</span></div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h5>Request Routed to SynapseOps Container</h5>
+              <p>ALB routes the request to one of the running containers — either in ECS Fargate (ap-south-1) or EKS (us-east-1). The container image was pulled from ECR at startup.</p>
+              <div class="step-services"><span class="step-svc">ECS / Fargate</span><span class="step-svc">EKS</span><span class="step-svc">ECR</span></div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h5>Log &amp; Metric Data Fetched from CloudWatch</h5>
+              <p>For any alert evaluation, performance analysis, SLA check, or deployment gate decision, the application runs CloudWatch Logs Insights queries against the monitored service's log group. Raw events are fetched directly if Insights has a delay.</p>
+              <div class="step-services"><span class="step-svc">CloudWatch Logs</span></div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <h5>AI Analysis via Amazon Bedrock</h5>
+              <p>Structured log data, error summaries, or user chat messages are sent to Bedrock (<code>invoke_model</code>). Claude 3 Haiku returns natural-language root-cause analysis, code fix suggestions, or chat responses.</p>
+              <div class="step-services"><span class="step-svc">Amazon Bedrock</span></div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <h5>Results Persisted to DynamoDB</h5>
+              <p>Alerts, AI-generated insights, auto-fix actions, PR/pipeline analysis results, and SLA metrics are written to DynamoDB for durability, history, and the activity feed.</p>
+              <div class="step-services"><span class="step-svc">DynamoDB</span></div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">6</div>
+            <div class="step-content">
+              <h5>Response Returned (Dashboard / WebSocket / API)</h5>
+              <p>Results are pushed to the user via REST API, real-time WebSocket updates, or as a webhook reply to GitHub/Teams. IAM roles (ECS task role or EKS IRSA) authorize all AWS API calls without any embedded credentials.</p>
+              <div class="step-services"><span class="step-svc">IAM</span><span class="step-svc">ALB / ELB</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SUMMARY TABLE ── -->
+  <section id="summary">
+    <h2>
+      <span class="section-icon" style="background:rgba(255,153,0,0.15);">📊</span>
+      Summary Reference Table
+    </h2>
+    <div class="summary-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>AWS Service</th>
+            <th>SDK Client</th>
+            <th>Key Operations</th>
+            <th>Region</th>
+            <th>Config Key</th>
+            <th>Category</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Amazon Bedrock</td>
+            <td><code>boto3.client("bedrock-runtime")</code></td>
+            <td>invoke_model</td>
+            <td>us-east-1 / ap-south-1</td>
+            <td><code>BEDROCK_MODEL_ID</code>, <code>BEDROCK_REGION</code></td>
+            <td><span class="tag tag-ai" style="display:inline-block">AI / ML</span></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>CloudWatch Logs</td>
+            <td><code>boto3.client("logs")</code></td>
+            <td>start_query, get_query_results, describe_log_streams, get_log_events</td>
+            <td>us-east-1 / ap-south-1</td>
+            <td><code>CLOUDWATCH_LOG_GROUP</code>, <code>AWS_REGION</code></td>
+            <td><span class="tag tag-runtime" style="display:inline-block">Monitoring</span></td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>DynamoDB</td>
+            <td><code>boto3.resource("dynamodb")</code></td>
+            <td>put_item, query, scan, create_table</td>
+            <td>us-east-1 / ap-south-1</td>
+            <td><code>DYNAMODB_TABLE_PREFIX</code></td>
+            <td><span class="tag tag-storage" style="display:inline-block">Storage</span></td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>ECS / Fargate</td>
+            <td>— (infra only)</td>
+            <td>Container hosting, task scheduling</td>
+            <td>ap-south-1</td>
+            <td><code>ecs/task-definition.json</code></td>
+            <td><span class="tag tag-infra" style="display:inline-block">Infra</span></td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>EKS</td>
+            <td>kubectl subprocess</td>
+            <td>get pods/nodes/services/deployments, cluster-info</td>
+            <td>us-east-1</td>
+            <td><code>helm/synapse-ops/values.yaml</code></td>
+            <td><span class="tag tag-infra" style="display:inline-block">Infra</span></td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>ECR</td>
+            <td>— (infra only)</td>
+            <td>Container image pull (ECS execution role / EKS node role)</td>
+            <td>ap-south-1 / us-east-1</td>
+            <td>Image URI in task-def &amp; values.yaml</td>
+            <td><span class="tag tag-infra" style="display:inline-block">Registry</span></td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>IAM</td>
+            <td>— (infra only)</td>
+            <td>Execution role, task role, IRSA for EKS</td>
+            <td>Global</td>
+            <td>Role ARNs in task-def &amp; Helm values</td>
+            <td><span class="tag tag-infra" style="display:inline-block">Security</span></td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>ALB / ELB</td>
+            <td>— (infra only)</td>
+            <td>HTTP routing, health checks</td>
+            <td>ap-south-1 / us-east-1</td>
+            <td><code>APP_BASE_URL</code></td>
+            <td><span class="tag tag-network" style="display:inline-block">Network</span></td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>STS</td>
+            <td><code>boto3.client("sts")</code></td>
+            <td>get_caller_identity</td>
+            <td>us-east-1</td>
+            <td><code>diagnose.py</code> only</td>
+            <td><span class="tag tag-diag" style="display:inline-block">Diagnostic</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;font-weight:600;">Services NOT Used</h4>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.7;">
+        The following AWS services are <strong>not</strong> used by SynapseOps:
+        <strong style="color:var(--text-main)">S3</strong>,
+        <strong style="color:var(--text-main)">SQS</strong>,
+        <strong style="color:var(--text-main)">SNS</strong>,
+        <strong style="color:var(--text-main)">Secrets Manager</strong>,
+        <strong style="color:var(--text-main)">SSM Parameter Store</strong>,
+        <strong style="color:var(--text-main)">ElastiCache</strong>,
+        <strong style="color:var(--text-main)">Lambda</strong>,
+        <strong style="color:var(--text-main)">API Gateway</strong>.
+        Redis is used for caching but runs as a standalone instance (not AWS ElastiCache).
+        Teams notifications are sent via webhook (not SNS). GitHub integration uses direct REST API calls (not EventBridge).
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<footer>
+  <strong>SynapseOps</strong> &mdash; AWS Architecture Document &mdash; Generated March 25, 2026
+  &nbsp;·&nbsp; 9 AWS Services &nbsp;·&nbsp; boto3 Python SDK &nbsp;·&nbsp; ECS Fargate (ap-south-1) &amp; EKS (us-east-1)
+</footer>
+
+</body>
+</html>

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import threading
+import uuid
 import boto3
 import structlog
 from typing import Optional
@@ -16,6 +17,8 @@ logger = structlog.get_logger()
 
 _client = None
 _client_lock = threading.Lock()
+_agent_runtime_client = None
+_agent_runtime_client_lock = threading.Lock()
 
 
 def _get_client():
@@ -31,6 +34,19 @@ def _get_client():
     return _client
 
 
+def _get_agent_runtime_client():
+    global _agent_runtime_client
+    if _agent_runtime_client is None:
+        with _agent_runtime_client_lock:
+            if _agent_runtime_client is None:
+                settings = get_settings()
+                _agent_runtime_client = boto3.client(
+                    "bedrock-agent-runtime", region_name=settings.bedrock_region,
+                    config=BotoConfig(retries={"max_attempts": 3, "mode": "adaptive"}, read_timeout=60),
+                )
+    return _agent_runtime_client
+
+
 def _strip_code_fences(text: str) -> str:
     """Remove markdown code fences from LLM output."""
     text = text.strip()
@@ -42,8 +58,19 @@ def _strip_code_fences(text: str) -> str:
 
 class LLMService:
     def __init__(self, model_id: Optional[str] = None):
+        settings = get_settings()
+        self.backend = settings.bedrock_backend
         self.client = _get_client()
-        self.model_id = model_id or get_settings().bedrock_model_id
+        self.agent_runtime_client = _get_agent_runtime_client() if self.backend == "agentcore" else None
+        self.model_id = model_id or settings.bedrock_model_id
+        self.agent_id = settings.bedrock_agent_id
+        self.agent_alias_id = settings.bedrock_agent_alias_id
+        self.agent_session_prefix = settings.bedrock_agent_session_prefix
+
+        if self.backend == "agentcore" and (not self.agent_id or not self.agent_alias_id):
+            raise ValueError(
+                "BEDROCK_BACKEND=agentcore requires BEDROCK_AGENT_ID and BEDROCK_AGENT_ALIAS_ID"
+            )
 
     def invoke(self, prompt: str, max_tokens: int = 1024, system: str = None) -> str:
         """Invoke a Bedrock model with retry, auto-detecting the request format from model_id."""
@@ -64,6 +91,9 @@ class LLMService:
             retryable_exceptions=_BEDROCK_RETRYABLE,
         )
         def _call():
+            if self.backend == "agentcore":
+                return self._invoke_agentcore(prompt, system=system)
+
             body = self._build_request_body(prompt, max_tokens, system=system)
             resp = self.client.invoke_model(
                 modelId=self.model_id, body=json.dumps(body),
@@ -76,6 +106,49 @@ class LLMService:
             return _call()
         except Exception as e:
             logger.error("bedrock_invoke_failed", model=self.model_id, error=str(e))
+            raise
+
+    def _invoke_agentcore(self, prompt: str, system: str = None) -> str:
+        """Invoke a Bedrock agent runtime (AgentCore mode).
+
+        We include system guidance inside the prompt because invoke_agent accepts input text,
+        and the agent configuration controls tool use/instructions server-side.
+        """
+        combined_prompt = prompt if not system else f"System instructions:\n{system}\n\nUser input:\n{prompt}"
+        session_id = f"{self.agent_session_prefix}-{uuid.uuid4().hex[:12]}"
+
+        logger.info("agentcore_invoke_start", agent_id=self.agent_id, session_id=session_id)
+        try:
+            resp = self.agent_runtime_client.invoke_agent(
+                agentId=self.agent_id,
+                agentAliasId=self.agent_alias_id,
+                sessionId=session_id,
+                inputText=combined_prompt,
+                enableTrace=False,
+            )
+
+            parts: list[str] = []
+            # resp["completion"] is an iterator of ResponseStreamEvent objects
+            for event in resp.get("completion", []):
+                if "chunk" not in event:
+                    continue
+                chunk_data = event["chunk"]
+                if "bytes" in chunk_data:
+                    chunk_bytes = chunk_data["bytes"]
+                    if isinstance(chunk_bytes, bytes):
+                        parts.append(chunk_bytes.decode("utf-8", errors="ignore"))
+                    else:
+                        parts.append(str(chunk_bytes))
+
+            text = "".join(parts).strip()
+            if not text:
+                logger.warning("agentcore_empty_response", session_id=session_id)
+                raise RuntimeError(f"AgentCore ({self.agent_id}) returned empty completion")
+            
+            logger.info("agentcore_invoke_success", session_id=session_id, response_length=len(text))
+            return text
+        except Exception as e:
+            logger.error("agentcore_invoke_failed", agent_id=self.agent_id, session_id=session_id, error=str(e))
             raise
 
     def _build_request_body(self, prompt: str, max_tokens: int, system: str = None) -> dict:

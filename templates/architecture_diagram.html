@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SynapseOps - Architecture Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            animation: fadeIn 0.6s ease-in;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .diagram-wrapper {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .mermaid {
+            background: #f9f9f9;
+            padding: 40px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 600px;
+        }
+
+        .mermaid svg {
+            width: 100% !important;
+            height: auto !important;
+            max-width: 100%;
+        }
+
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .legend-item:hover {
+            background: #efefef;
+            transform: translateX(4px);
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .color-app { background: #4A90E2; }
+        .color-aws { background: #FF9900; }
+        .color-external { background: #232F3E; }
+        .color-data { background: #FF9900; }
+
+        .legend-text {
+            font-size: 0.9em;
+            color: #333;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .info-section {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .info-section h3 {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .info-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-section li {
+            padding: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .info-section li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .diagram-wrapper {
+                padding: 15px;
+            }
+
+            .legend {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 SynapseOps Architecture</h1>
+            <p>Intelligent DevOps Platform with AI-Powered Automation</p>
+        </header>
+
+        <div class="diagram-wrapper">
+            <div class="mermaid">
+graph TB
+    subgraph "👥 Client Layer"
+        WEB["🌐 Web UI<br/>HTML/Static"]
+        CHAT["💬 Chat Interface"]
+        MON["📊 Monitoring Dashboard"]
+    end
+
+    subgraph "🔗 API Layer"
+        ALB["⚖️ ALB<br/>synapse-ops-alb"]
+        HEALTH["❤️ Health Check<br/>/health"]
+    end
+
+    subgraph "⚙️ Application Layer - FastAPI"
+        APP["🔷 FastAPI App<br/>app/main.py<br/>Port 5000"]
+        
+        subgraph "Routes"
+            ALERTS["🔔 Alerts"]
+            CHAT_ROUTE["💬 Chat"]
+            METRICS_ROUTE["📈 Metrics"]
+            WS["🔄 WebSockets"]
+        end
+        
+        subgraph "Core Services"
+            CACHE["💾 Cache"]
+            NOTIFIER["📬 Notifier"]
+            RETRY["🔁 Retry"]
+            PERFMON["⚡ Performance"]
+            DEDUP["♻️ Dedup"]
+        end
+        
+        subgraph "🔍 Analysis Services"
+            ANOMALY["👁️ Anomaly Detector"]
+            ERROR["❌ Error Analyzer"]
+            CODE["🔎 Code Analyzer"]
+            INCIDENT["🚨 Incident"]
+            LOG["📋 Log Analyzer"]
+        end
+        
+        subgraph "🤖 Automation Services"
+            AUTO_FIX["🔧 Auto Fix"]
+            AUTO_HEAL["💊 Auto Healer"]
+            CONFLICT["⚔️ Conflict Detector"]
+            DEP_GATE["🚪 Deploy Gate"]
+            DEP_TRACK["📍 Deploy Tracker"]
+        end
+        
+        subgraph "🧠 Chat & LLM"
+            CHAT_ENGINE["⚡ Chat Engine"]
+            LLM["🤖 Bedrock LLM"]
+        end
+    end
+
+    subgraph "☁️ Infrastructure"
+        ECS["🐳 ECS Fargate<br/>auth-api-poc-cluster<br/>synapse-ops-service"]
+        TG["🎯 Target Group<br/>synapse-ops-tg"]
+        K8S["☸️ Kubernetes<br/>Helm Charts"]
+    end
+
+    subgraph "📦 Data & Monitoring"
+        CW["📊 CloudWatch"]
+        DDB["🗄️ DynamoDB"]
+        S3["🪣 S3 Bucket<br/>synapseops"]
+    end
+
+    subgraph "🌍 External Services"
+        BEDROCK["🤖 AWS Bedrock<br/>Claude LLM"]
+        GITHUB["🐙 GitHub"]
+        K8S_EXTERNAL["☸️ K8s Cluster"]
+    end
+
+    subgraph "🔄 CI/CD Pipeline"
+        GHA["🚀 GitHub Actions"]
+        WF_POC["📝 deploy-poc.yml"]
+        WF_EKS["📝 deploy.yml"]
+        ECR["📦 ECR Registry"]
+    end
+
+    WEB --> ALB
+    CHAT --> ALB
+    MON --> ALB
+    ALB --> HEALTH
+    ALB --> APP
+
+    APP --> ALERTS
+    APP --> CHAT_ROUTE
+    APP --> METRICS_ROUTE
+    APP --> WS
+
+    CHAT_ROUTE --> CHAT_ENGINE
+    CHAT_ENGINE --> LLM
+    ALERTS --> ANOMALY
+    ALERTS --> ERROR
+    METRICS_ROUTE --> PERFMON
+
+    AUTO_FIX --> CODE
+    CONFLICT --> INCIDENT
+    DEP_GATE --> DEP_TRACK
+    LOG --> INCIDENT
+
+    APP --> CW
+    APP --> DDB
+    CHAT_ENGINE --> DDB
+    LLM --> BEDROCK
+    APP --> K8S_EXTERNAL
+
+    APP --> ECS
+    ECS --> TG
+    TG --> ALB
+    ECS --> K8S
+
+    GITHUB --> GHA
+    GHA --> WF_POC
+    GHA --> WF_EKS
+    WF_POC --> ECR
+    WF_EKS --> ECR
+    ECR --> ECS
+    ECR --> K8S
+
+    APP -.->|Upload| S3
+    S3 -.->|Retrieve| APP
+
+    style APP fill:#4A90E2,stroke:#2E5C8A,color:#fff,font-weight:bold
+    style ALB fill:#FF9900,stroke:#B87000,color:#fff,font-weight:bold
+    style ECS fill:#FF9900,stroke:#B87000,color:#fff,font-weight:bold
+    style BEDROCK fill:#232F3E,stroke:#000,color:#fff,font-weight:bold
+    style GHA fill:#333,stroke:#000,color:#fff,font-weight:bold
+    style DDB fill:#FF9900,stroke:#B87000,color:#fff,font-weight:bold
+    style CW fill:#FF9900,stroke:#B87000,color:#fff,font-weight:bold
+    style S3 fill:#FF9900,stroke:#B87000,color:#fff,font-weight:bold
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color color-app"></div>
+                <span class="legend-text">FastAPI Application Core</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color color-aws"></div>
+                <span class="legend-text">AWS Services</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color color-external"></div>
+                <span class="legend-text">External Services</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color color-data"></div>
+                <span class="legend-text">Data & Storage</span>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>📋 About SynapseOps</h3>
+            <ul>
+                <li><strong>Framework:</strong> FastAPI with async support</li>
+                <li><strong>Compute:</strong> AWS ECS Fargate + Kubernetes support</li>
+                <li><strong>AI/ML:</strong> AWS Bedrock Claude LLM integration</li>
+                <li><strong>Automation:</strong> AI-powered auto-healing, conflict detection, and deployment gates</li>
+                <li><strong>Data:</strong> DynamoDB for state, CloudWatch for observability</li>
+                <li><strong>CI/CD:</strong> GitHub Actions with multi-environment support</li>
+                <li><strong>Communication:</strong> WebSockets, real-time alerts, Teams notifications</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>SynapseOps Architecture Diagram • Generated {{ current_year }} • Version 1.0</p>
+        </footer>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            securityLevel: 'loose',
+            themeVariables: {
+                'fontSize': '20px',
+                'fontFamily': 'arial',
+                'primaryTextColor': '#000',
+                'tertiaryTextColor': '#000',
+                'primaryBorderColor': '#333'
+            },
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis',
+                nodeSpacing: 80,
+                rankSpacing: 100,
+                padding: '20px'
+            },
+            logLevel: 'warn'
+        });
+        mermaid.contentLoaded();
+    </script>
+</body>
+</html>

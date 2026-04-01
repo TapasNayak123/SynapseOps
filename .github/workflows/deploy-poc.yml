@@ -128,21 +128,27 @@ jobs:
           # Read the task definition template
           TASK_DEF=$(cat ecs/task-definition.json)
 
-          # Replace image tag and ALB URL
+          # Update image and environment variables
           TASK_DEF=$(echo "$TASK_DEF" | jq \
             --arg IMAGE "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
             --arg ALB_URL "http://${{ env.ALB_DNS }}" \
-            --arg GITHUB_REPO "${{ vars.POC_TARGET_GITHUB_REPO }}" \
+            --arg BEDROCK_BACKEND "${{ vars.POC_BEDROCK_BACKEND }}" \
+            --arg BEDROCK_AGENT_ID "${{ vars.POC_BEDROCK_AGENT_ID }}" \
+            --arg BEDROCK_AGENT_ALIAS_ID "${{ vars.POC_BEDROCK_AGENT_ALIAS_ID }}" \
+            --arg BEDROCK_AGENT_SESSION_PREFIX "${{ vars.POC_BEDROCK_AGENT_SESSION_PREFIX }}" \
             --arg TEAMS_URL "${{ secrets.TEAMS_WEBHOOK_URL }}" \
             --arg GH_TOKEN "${{ secrets.TARGET_REPO_TOKEN }}" \
             --arg GH_SECRET "${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
+            --arg GITHUB_REPO "${{ vars.POC_TARGET_GITHUB_REPO }}" \
             '.containerDefinitions[0].image = $IMAGE |
-             .containerDefinitions[0].environment = [.containerDefinitions[0].environment[] |
+             .containerDefinitions[0].environment |= map(
                if .name == "APP_BASE_URL" then .value = $ALB_URL
-               elif .name == "GITHUB_REPO" then .value = $GITHUB_REPO
-               else . end] +
-               (if $GITHUB_REPO != "" then [{"name": "GITHUB_REPO", "value": $GITHUB_REPO}] else [] end) |
-             .containerDefinitions[0].environment |= unique_by(.name) |
+               elif .name == "BEDROCK_BACKEND" and $BEDROCK_BACKEND != "" then .value = $BEDROCK_BACKEND
+               elif .name == "BEDROCK_AGENT_ID" and $BEDROCK_AGENT_ID != "" then .value = $BEDROCK_AGENT_ID
+               elif .name == "BEDROCK_AGENT_ALIAS_ID" and $BEDROCK_AGENT_ALIAS_ID != "" then .value = $BEDROCK_AGENT_ALIAS_ID
+               elif .name == "BEDROCK_AGENT_SESSION_PREFIX" and $BEDROCK_AGENT_SESSION_PREFIX != "" then .value = $BEDROCK_AGENT_SESSION_PREFIX
+               else . end
+             ) |
              .containerDefinitions[0].environment += [
                {"name": "TEAMS_WEBHOOK_URL", "value": $TEAMS_URL},
                {"name": "GITHUB_TOKEN", "value": $GH_TOKEN},

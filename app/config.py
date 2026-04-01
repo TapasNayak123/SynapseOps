@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     teams_webhook_url: str = ""
     bedrock_model_id: str = "anthropic.claude-3-haiku-20240307-v1:0"
     bedrock_region: str = "us-east-1"
+    bedrock_backend: str = "runtime"  # runtime | agentcore
+    bedrock_agent_id: str = ""
+    bedrock_agent_alias_id: str = ""
+    bedrock_agent_session_prefix: str = "synapseops"
 
     # --- PR analysis / webhook settings ---
     github_webhook_secret: str = ""
@@ -57,6 +61,14 @@ class Settings(BaseSettings):
         if v <= 0:
             raise ValueError("poll_interval must be positive")
         return v
+
+    @field_validator("bedrock_backend")
+    @classmethod
+    def validate_bedrock_backend(cls, v: str) -> str:
+        normalized = (v or "runtime").strip().lower()
+        if normalized not in {"runtime", "agentcore"}:
+            raise ValueError("bedrock_backend must be either 'runtime' or 'agentcore'")
+        return normalized
 
     @property
     def github_repos_list(self) -> list[str]:
