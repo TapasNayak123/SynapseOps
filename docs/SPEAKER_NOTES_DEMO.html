@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SynapseOps — 8-Minute Demo Speaker Notes</title>
+  <style>
+    /* ── Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --aws-orange: #FF9900;
+      --aws-dark:   #232F3E;
+      --aws-blue:   #1A69C4;
+      --aws-teal:   #01A88D;
+      --accent-red: #D63031;
+      --bg:         #F7F8FA;
+      --surface:    #FFFFFF;
+      --border:     #E2E6EA;
+      --text:       #1A202C;
+      --muted:      #6B7280;
+      --tag-bg:     #EEF2FF;
+      --tag-text:   #3730A3;
+
+      /* section palette */
+      --s1: #4F46E5; /* indigo  */
+      --s2: #0EA5E9; /* sky     */
+      --s3: #10B981; /* emerald */
+      --s4: #F59E0B; /* amber   */
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, var(--aws-dark) 0%, #1a2a40 60%, #0d3b5e 100%);
+      color: #fff;
+      padding: 3rem 2rem 2.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: "";
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 70% 50%, rgba(255,153,0,.15) 0%, transparent 60%);
+    }
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      position: relative;
+    }
+    header h1 span { color: var(--aws-orange); }
+    header .subtitle {
+      margin-top: .5rem;
+      font-size: .95rem;
+      color: rgba(255,255,255,.7);
+      position: relative;
+    }
+
+    /* ── Timing Bar ── */
+    .timing-bar {
+      background: var(--aws-dark);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+    .timing-pill {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .4rem .9rem;
+      border-radius: 999px;
+      font-size: .78rem;
+      font-weight: 600;
+      color: #fff;
+      margin: .25rem;
+    }
+    .timing-pill .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .tp-open  { background: rgba(255,255,255,.08); }
+    .tp-s1    { background: rgba(79,70,229,.35);  } .tp-s1 .dot  { background: #818CF8; }
+    .tp-s2    { background: rgba(14,165,233,.3);  } .tp-s2 .dot  { background: #38BDF8; }
+    .tp-s3    { background: rgba(16,185,129,.3);  } .tp-s3 .dot  { background: #34D399; }
+    .tp-s4    { background: rgba(245,158,11,.3);  } .tp-s4 .dot  { background: #FCD34D; }
+    .tp-close { background: rgba(255,255,255,.08); }
+
+    /* ── Layout ── */
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    /* ── Section Card ── */
+    .section-card {
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+      margin-bottom: 2rem;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .section-header {
+      padding: 1.1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: .85rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    .section-title-block h2 { font-size: 1.1rem; font-weight: 700; }
+    .section-title-block .badge {
+      display: inline-block;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: .15rem .55rem;
+      border-radius: 999px;
+      margin-top: .2rem;
+    }
+    .section-body { padding: 1.5rem; }
+
+    /* colour variants */
+    .s-open  .section-header { background: linear-gradient(90deg, #1e2d3d, #243447); }
+    .s-open  .section-header h2,
+    .s-open  .section-icon   { color: var(--aws-orange); }
+    .s-open  .section-icon   { background: rgba(255,153,0,.15); }
+
+    .s1 .section-header { background: linear-gradient(90deg, #EEF2FF, #F5F3FF); }
+    .s1 .section-icon   { background: #EEF2FF; color: var(--s1); }
+    .s1 .section-title-block h2 { color: var(--s1); }
+    .s1 .badge          { background: #EEF2FF; color: var(--s1); }
+
+    .s2 .section-header { background: linear-gradient(90deg, #F0F9FF, #E0F2FE); }
+    .s2 .section-icon   { background: #E0F2FE; color: var(--s2); }
+    .s2 .section-title-block h2 { color: var(--s2); }
+    .s2 .badge          { background: #E0F2FE; color: #0369A1; }
+
+    .s3 .section-header { background: linear-gradient(90deg, #F0FDF4, #DCFCE7); }
+    .s3 .section-icon   { background: #DCFCE7; color: var(--s3); }
+    .s3 .section-title-block h2 { color: #047857; }
+    .s3 .badge          { background: #DCFCE7; color: #047857; }
+
+    .s4 .section-header { background: linear-gradient(90deg, #FFFBEB, #FEF9C3); }
+    .s4 .section-icon   { background: #FEF3C7; color: #D97706; }
+    .s4 .section-title-block h2 { color: #B45309; }
+    .s4 .badge          { background: #FEF3C7; color: #B45309; }
+
+    .s-close .section-header { background: linear-gradient(90deg, #232F3E, #1a2536); }
+    .s-close .section-header h2,
+    .s-close .section-icon   { color: var(--aws-orange); }
+    .s-close .section-icon   { background: rgba(255,153,0,.15); }
+
+    /* ── Sub-section ── */
+    .sub {
+      border-left: 3px solid var(--border);
+      padding-left: 1rem;
+      margin-bottom: 1.4rem;
+    }
+    .sub:last-child { margin-bottom: 0; }
+    .sub-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .6rem;
+    }
+    .sub-title { font-weight: 700; font-size: .95rem; }
+    .time-chip {
+      font-size: .7rem; font-weight: 600;
+      padding: .15rem .5rem;
+      border-radius: 999px;
+      background: #F3F4F6;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ── Spoken text box ── */
+    .speech {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-left: 4px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      font-size: .9rem;
+      color: #334155;
+      position: relative;
+    }
+    .speech::before {
+      content: "🎤";
+      position: absolute;
+      top: .7rem; right: .8rem;
+      font-size: .85rem;
+      opacity: .5;
+    }
+
+    /* ── Stage note ── */
+    .stage-note {
+      display: flex;
+      align-items: flex-start;
+      gap: .5rem;
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
+      border-radius: 6px;
+      padding: .5rem .8rem;
+      font-size: .8rem;
+      color: #92400E;
+      margin-bottom: .75rem;
+    }
+    .stage-note svg { flex-shrink: 0; margin-top: 2px; }
+
+    /* ── Lists ── */
+    ul, ol { padding-left: 1.3rem; }
+    li { margin-bottom: .35rem; }
+    li:last-child { margin-bottom: 0; }
+
+    /* ── Table ── */
+    .aws-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .aws-table th {
+      background: var(--aws-dark);
+      color: #fff;
+      padding: .55rem .9rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: .8rem;
+      letter-spacing: .3px;
+    }
+    .aws-table th:first-child { border-radius: 8px 0 0 0; }
+    .aws-table th:last-child  { border-radius: 0 8px 0 0; }
+    .aws-table td {
+      padding: .55rem .9rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .aws-table tr:last-child td { border-bottom: none; }
+    .aws-table tr:nth-child(even) td { background: #F8FAFC; }
+    .aws-badge {
+      display: inline-block;
+      background: #FF9900;
+      color: #000;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: .1rem .45rem;
+      border-radius: 4px;
+    }
+
+    /* ── Timing summary table ── */
+    .timing-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .timing-table th {
+      background: #F1F5F9;
+      color: var(--muted);
+      padding: .5rem .8rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .timing-table td { padding: .5rem .8rem; border-bottom: 1px solid var(--border); font-size: .85rem; }
+    .timing-table tr:last-child td { border-bottom: none; }
+    .t-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: .4rem; vertical-align: middle; }
+
+    /* ── Checklist ── */
+    .checklist { list-style: none; padding: 0; }
+    .checklist li {
+      display: flex; align-items: flex-start; gap: .6rem;
+      padding: .45rem 0;
+      border-bottom: 1px solid #F3F4F6;
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .check-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+    .checklist code {
+      background: #EEF2FF;
+      color: #3730A3;
+      padding: .1rem .4rem;
+      border-radius: 4px;
+      font-size: .8rem;
+      font-family: "Fira Code", "Cascadia Code", monospace;
+    }
+
+    /* ── Inline code ── */
+    code {
+      background: #F1F5F9;
+      color: #5B21B6;
+      padding: .1rem .35rem;
+      border-radius: 4px;
+      font-size: .85em;
+      font-family: "Fira Code", "Cascadia Code", monospace;
+    }
+
+    /* ── Bold highlights ── */
+    strong { color: #1E293B; font-weight: 700; }
+
+    /* ── Progress indicator ── */
+    .progress-track {
+      display: flex;
+      gap: 0;
+      margin-bottom: 2rem;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .progress-seg {
+      flex: 1;
+      padding: .4rem .3rem;
+      text-align: center;
+      font-size: .68rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .ps-open  { background: #374151; flex: 0.5; }
+    .ps-s1    { background: var(--s1); flex: 2; }
+    .ps-s2    { background: var(--s2); flex: 2; }
+    .ps-s3    { background: var(--s3); flex: 1.5; }
+    .ps-s4    { background: var(--s4); color: #333; flex: 1.5; }
+    .ps-close { background: #374151; flex: 0.5; }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; font-size: 13px; }
+      .timing-bar { display: none; }
+      .section-card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+      header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════  HEADER  ═══════════════════ -->
+<header>
+  <h1><span>SynapseOps</span> — 8-Minute Demo Speaker Notes</h1>
+  <p class="subtitle">AWS Codeathon 2026 &nbsp;·&nbsp; TopGear Challenge &nbsp;·&nbsp; Theme 1: AI-Powered Developer Productivity Platform</p>
+</header>
+
+<!-- ═══════════════════  TIMING BAR  ═══════════════════ -->
+<div class="timing-bar">
+  <div class="timing-pill tp-open">⏱ Opening · 0:30</div>
+  <div class="timing-pill tp-s1"><span class="dot"></span>Section 1 · 2:00</div>
+  <div class="timing-pill tp-s2"><span class="dot"></span>Section 2 · 2:00</div>
+  <div class="timing-pill tp-s3"><span class="dot"></span>Section 3 · 1:30</div>
+  <div class="timing-pill tp-s4"><span class="dot"></span>Section 4 · 1:30</div>
+  <div class="timing-pill tp-close">🏁 Close · 0:30</div>
+</div>
+
+<!-- ═══════════════════  MAIN CONTENT  ═══════════════════ -->
+<div class="container">
+
+  <!-- Progress Track -->
+  <div class="progress-track" title="8-minute timeline">
+    <div class="progress-seg ps-open">Open<br/>0:30</div>
+    <div class="progress-seg ps-s1">Section 1<br/>App Quality<br/>2:00</div>
+    <div class="progress-seg ps-s2">Section 2<br/>AWS Services<br/>2:00</div>
+    <div class="progress-seg ps-s3">Section 3<br/>Productivity<br/>1:30</div>
+    <div class="progress-seg ps-s4">Section 4<br/>Innovation<br/>1:30</div>
+    <div class="progress-seg ps-close">Close<br/>0:30</div>
+  </div>
+
+  <!-- ─── TIMING GUIDE ─── -->
+  <div class="section-card s-open" style="border-left: 4px solid var(--aws-orange);">
+    <div class="section-header">
+      <div class="section-icon">🗓</div>
+      <div class="section-title-block">
+        <h2 style="color:#FF9900;">Timing Guide</h2>
+      </div>
+    </div>
+    <div class="section-body">
+      <table class="timing-table">
+        <thead>
+          <tr><th>Segment</th><th>Duration</th><th>Cumulative</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="t-dot" style="background:#6B7280;"></span>Opening Hook</td><td>0:30</td><td>0:30</td></tr>
+          <tr><td><span class="t-dot" style="background:#4F46E5;"></span>Section 1 — Application Functionality &amp; Quality</td><td>2:00</td><td>2:30</td></tr>
+          <tr><td><span class="t-dot" style="background:#0EA5E9;"></span>Section 2 — AWS Services Feature Utilization</td><td>2:00</td><td>4:30</td></tr>
+          <tr><td><span class="t-dot" style="background:#10B981;"></span>Section 3 — Productivity Demonstration</td><td>1:30</td><td>6:00</td></tr>
+          <tr><td><span class="t-dot" style="background:#F59E0B;"></span>Section 4 — Innovation &amp; Creativity</td><td>1:30</td><td>7:30</td></tr>
+          <tr><td><span class="t-dot" style="background:#6B7280;"></span>Closing</td><td>0:30</td><td>8:00</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── OPENING ─── -->
+  <div class="section-card s-open" style="border-left:4px solid var(--aws-orange);">
+    <div class="section-header">
+      <div class="section-icon">🎯</div>
+      <div class="section-title-block">
+        <h2 style="color:#FF9900;">Opening Hook</h2>
+        <span class="badge" style="background:rgba(255,153,0,.15);color:#FF9900;">0:30</span>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="stage-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Stand in front of the live dashboard or architecture diagram.
+      </div>
+      <div class="speech">
+        "Every engineering team I've spoken to has the same pain — developers spend more time firefighting pipelines, chasing failed builds, and triaging production alerts than writing code that actually ships.<br/><br/>
+        <strong>SynapseOps</strong> is our answer to that. It's an AI-powered DevOps agent — an always-on, autonomous teammate that reviews your PRs, heals broken pipelines, monitors your production APIs, and answers infrastructure questions in plain English. All without anyone opening a terminal.<br/><br/>
+        Let me show you exactly how it works."
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SECTION 1 ─── -->
+  <div class="section-card s1">
+    <div class="section-header">
+      <div class="section-icon">🏗</div>
+      <div class="section-title-block">
+        <h2>Section 1 — Application Functionality &amp; Quality</h2>
+        <span class="badge">2:00</span>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <!-- Architecture -->
+      <div class="sub" style="border-color:#4F46E5;">
+        <div class="sub-header">
+          <span class="sub-title">Architecture</span>
+          <span class="time-chip">~20s</span>
+        </div>
+        <div class="stage-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Point to the architecture diagram on screen.
+        </div>
+        <div class="speech">
+          "SynapseOps is a <strong>FastAPI application deployed on AWS ECS Fargate</strong>, fronted by an Application Load Balancer. It has four core pillars:
+          <ol style="margin-top:.6rem;">
+            <li>A <strong>multi-agent PR analysis pipeline</strong> — event-driven via GitHub webhooks</li>
+            <li>A <strong>pipeline failure auto-healer</strong> — spots CI/CD failures, generates fixes, and commits them</li>
+            <li>A <strong>real-time monitoring engine</strong> — continuously analyzing your API traffic in CloudWatch</li>
+            <li>A <strong>natural-language chat interface</strong> — so any engineer can query infrastructure without SQL or Logs Insights queries</li>
+          </ol>
+          All pillars share a common persistence layer — DynamoDB for durability and Redis for caching and rate-limiting."
+        </div>
+      </div>
+
+      <!-- Functionality -->
+      <div class="sub" style="border-color:#4F46E5;">
+        <div class="sub-header">
+          <span class="sub-title">Functionality</span>
+          <span class="time-chip">~30s</span>
+        </div>
+        <div class="stage-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Switch to the live dashboard or demo the webhook flow.
+        </div>
+        <div class="speech">
+          "Let me walk you through a real flow. When a developer opens a pull request:
+          <ul style="margin-top:.6rem;">
+            <li>GitHub fires a webhook to our <code>/webhook</code> endpoint</li>
+            <li><strong>Five specialized AI agents</strong> run in sequence — a Diff Analyst, a Code Reviewer, a Summary Generator, a Priority Assessor, and a Description Generator</li>
+            <li>Within seconds, an AI-generated review lands on the PR as a GitHub comment</li>
+            <li>A rich <strong>Microsoft Teams adaptive card</strong> is delivered with inline Approve/Reject action buttons</li>
+            <li>In parallel, our <strong>Conflict Detector</strong> scans every other open PR and flags if two developers are touching the same files</li>
+          </ul>
+          <br/>For pipeline failures, the flow is equally automated — we fetch failed job logs, send them to Bedrock for root cause analysis, generate a concrete code fix, push it to the branch, re-trigger the pipeline, and notify the team. <strong>Zero human intervention.</strong>"
+        </div>
+      </div>
+
+      <!-- Unit Test Coverage -->
+      <div class="sub" style="border-color:#4F46E5;">
+        <div class="sub-header">
+          <span class="sub-title">Unit Test Coverage</span>
+          <span class="time-chip">~20s</span>
+        </div>
+        <div class="speech">
+          "The codebase follows a layered FastAPI architecture — routes, services, models — with full <strong>Pydantic validation at every boundary</strong>. Each route has field-level validators with explicit error messages. The retry decorator in <code>app/services/retry.py</code> is designed with exponential backoff and jitter, tested for Bedrock throttling, GitHub rate-limits, and Teams webhook timeouts separately. All external API calls are guarded with <code>try/except</code> blocks and logged via <code>structlog</code> with structured context."
+        </div>
+      </div>
+
+      <!-- Deployment & Setup -->
+      <div class="sub" style="border-color:#4F46E5;">
+        <div class="sub-header">
+          <span class="sub-title">Deployment &amp; Setup</span>
+          <span class="time-chip">~20s</span>
+        </div>
+        <div class="speech">
+          "Deployment is fully containerized. We have:
+          <ul style="margin-top:.6rem;">
+            <li>A <strong>Dockerfile</strong> for the FastAPI application</li>
+            <li>An <strong>ECS task definition</strong> with IRSA-style IAM roles for least-privilege AWS access</li>
+            <li>A <strong>Helm chart</strong> for Kubernetes/EKS if teams prefer that route</li>
+            <li>Environment-driven configuration — swap models, thresholds, and log groups with env vars, zero code changes</li>
+          </ul>
+          The live endpoint is running right now at our ECS ALB in <code>ap-south-1</code>."
+        </div>
+      </div>
+
+      <!-- Testing & Validation -->
+      <div class="sub" style="border-color:#4F46E5;">
+        <div class="sub-header">
+          <span class="sub-title">Testing &amp; Validation Proof Points</span>
+          <span class="time-chip">~15s</span>
+        </div>
+        <div class="speech">
+          "Proof points:
+          <ul style="margin-top:.6rem;">
+            <li>The monitoring engine runs on a <strong>60-second APScheduler loop</strong> — five independent job functions, each fault-isolated so one failure doesn't cascade</li>
+            <li>Deduplication middleware (<code>app/services/dedup.py</code>) ensures duplicate webhook events don't spawn duplicate agent runs</li>
+            <li>Alert cooldowns are enforced via Redis TTLs — no alert storms</li>
+          </ul>"
+        </div>
+      </div>
+
+      <!-- Documentation -->
+      <div class="sub" style="border-color:#4F46E5;">
+        <div class="sub-header">
+          <span class="sub-title">Documentation</span>
+          <span class="time-chip">~15s</span>
+        </div>
+        <div class="speech">
+          "Documentation is comprehensive — we have a <code>DOCUMENTATION.md</code>, an <code>ARCHITECTURE.md</code>, a <code>QUICK_FIX.md</code> for operators, a <code>TROUBLESHOOTING</code> guide, and a setup_webhook guide. The <code>aidlc-docs</code> folder captures every design decision from requirements through infrastructure — fully traceable."
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── SECTION 2 ─── -->
+  <div class="section-card s2">
+    <div class="section-header">
+      <div class="section-icon">☁️</div>
+      <div class="section-title-block">
+        <h2>Section 2 — AWS Services Feature Utilization</h2>
+        <span class="badge">2:00</span>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <!-- KIRO -->
+      <div class="sub" style="border-color:#0EA5E9;">
+        <div class="sub-header">
+          <span class="sub-title">KIRO Usage</span>
+          <span class="time-chip">~30s</span>
+        </div>
+        <div class="stage-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Reference the <code>aidlc-docs/</code> directory structure on screen.
+        </div>
+        <div class="speech">
+          "<strong>KIRO</strong> — Amazon's AI IDE — was central to how this solution was built. We used KIRO's <strong>AI-Driven Development Lifecycle (AI-DLC)</strong> feature end-to-end:
+          <ul style="margin-top:.6rem;">
+            <li>KIRO guided us through <strong>10 structured stages</strong>: requirements → user stories → application design → functional design → NFR requirements → NFR design → infrastructure design → code generation → build and test</li>
+            <li>Every stage produced reviewable artifacts in <code>aidlc-docs/</code> before any code was written</li>
+            <li>KIRO's spec-driven approach meant our architecture was deliberate, not accidental — <strong>19 components, 47 methods</strong>, all designed before the first line of code was generated</li>
+          </ul>
+          This is KIRO doing what it's designed to do: making AI a full development partner, not just an autocomplete."
+        </div>
+      </div>
+
+      <!-- Bedrock AgentCore -->
+      <div class="sub" style="border-color:#0EA5E9;">
+        <div class="sub-header">
+          <span class="sub-title">Amazon Bedrock AgentCore Implementation</span>
+          <span class="time-chip">~35s</span>
+        </div>
+        <div class="speech">
+          "<strong>Amazon Bedrock</strong> is the intelligence backbone of SynapseOps. We use <strong>Claude 3 Haiku</strong> as our primary model — fast, cost-efficient, and accurate for code analysis tasks.<br/><br/>
+          What makes our Bedrock integration production-grade is the <strong>dual-backend architecture</strong> in <code>app/services/llm.py</code>:
+          <ul style="margin-top:.6rem;">
+            <li>In <code>runtime</code> mode — we invoke Bedrock directly via <code>bedrock-runtime</code>, building model-specific request bodies for Anthropic, Nova, and Meta models</li>
+            <li>In <code>agentcore</code> mode — we switch to <code>bedrock-agent-runtime</code> and invoke a pre-deployed <strong>Bedrock Agent</strong> with a persistent session, enabling stateful, multi-turn reasoning</li>
+          </ul>
+          The backend is toggled with a single env var: <code>BEDROCK_BACKEND=agentcore</code>. Retry logic, timeout handling, and structured logging are shared across both modes.<br/><br/>
+          We also use <strong>Bedrock for four distinct workloads</strong> simultaneously: PR code review, pipeline log analysis, production error fix generation, and natural-language chat response synthesis."
+        </div>
+      </div>
+
+      <!-- AWS Breadth -->
+      <div class="sub" style="border-color:#0EA5E9;">
+        <div class="sub-header">
+          <span class="sub-title">Breadth of AWS Services Leveraged</span>
+          <span class="time-chip">~55s</span>
+        </div>
+        <div class="speech" style="padding-bottom:.75rem;">
+          "We don't just use Bedrock — SynapseOps is a genuine multi-service AWS integration:"
+        </div>
+        <div style="margin-top:.75rem; overflow-x:auto;">
+          <table class="aws-table">
+            <thead>
+              <tr><th>Service</th><th>How We Use It</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="aws-badge">ECS</span> Amazon ECS Fargate</td><td>Serverless container hosting for the FastAPI app</td></tr>
+              <tr><td><span class="aws-badge">ECR</span> Amazon ECR</td><td>Private image registry — <code>127214194014.dkr.ecr.ap-south-1</code></td></tr>
+              <tr><td><span class="aws-badge">AI</span> Amazon Bedrock</td><td>LLM inference — Claude 3 Haiku — for all AI workloads</td></tr>
+              <tr><td><span class="aws-badge">DB</span> Amazon DynamoDB</td><td>Persistent storage for PR records, alerts, metrics, audit logs</td></tr>
+              <tr><td><span class="aws-badge">CW</span> CloudWatch Logs Insights</td><td>Primary data source for API error rates, latency, traffic analysis</td></tr>
+              <tr><td><span class="aws-badge">CACHE</span> ElastiCache (Redis)</td><td>Caching, rate limiting, alert cooldown TTLs</td></tr>
+              <tr><td><span class="aws-badge">ALB</span> Elastic Load Balancer</td><td>Public HTTPS endpoint &amp; GitHub webhook receiver</td></tr>
+              <tr><td><span class="aws-badge">IAM</span> AWS IAM with IRSA</td><td>Pod-level least-privilege access — task roles scoped per service</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="speech" style="margin-top:.75rem;">
+          "Eight services working together, each with a distinct, justified purpose — not checkbox architecture."
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── SECTION 3 ─── -->
+  <div class="section-card s3">
+    <div class="section-header">
+      <div class="section-icon">📈</div>
+      <div class="section-title-block">
+        <h2>Section 3 — Productivity Demonstration</h2>
+        <span class="badge">1:30</span>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <!-- Adoption Readiness -->
+      <div class="sub" style="border-color:#10B981;">
+        <div class="sub-header">
+          <span class="sub-title">Solution Adoption Readiness</span>
+          <span class="time-chip">~20s</span>
+        </div>
+        <div class="speech">
+          "SynapseOps is <strong>ready to wire into any existing GitHub repository in under 10 minutes</strong>:
+          <ol style="margin-top:.6rem;">
+            <li>Set <code>GITHUB_REPO</code>, <code>GITHUB_TOKEN</code>, and <code>GITHUB_WEBHOOK_SECRET</code> as environment variables</li>
+            <li>Register the ALB URL as a GitHub webhook for <code>pull_request</code> and <code>workflow_run</code> events</li>
+            <li>Point <code>CLOUDWATCH_LOG_GROUP</code> at your application's log group</li>
+            <li>Optionally configure <code>TEAMS_WEBHOOK_URL</code> for notifications</li>
+          </ol>
+          No SDK changes. No code modifications in the target repo. No agent to install. It's purely event-driven from the outside."
+        </div>
+      </div>
+
+      <!-- Quality -->
+      <div class="sub" style="border-color:#10B981;">
+        <div class="sub-header">
+          <span class="sub-title">Quality of Solution</span>
+          <span class="time-chip">~20s</span>
+        </div>
+        <div class="speech">
+          "The solution is designed for operational reality:
+          <ul style="margin-top:.6rem;">
+            <li><strong>Retry with exponential backoff and jitter</strong> on all three external integrations — Bedrock, GitHub, and Teams — max 3 retries with adaptive delays up to 30 seconds</li>
+            <li><strong>Redis-backed alert cooldowns</strong> prevent notification floods — configurable per-API</li>
+            <li><strong>Structured logging</strong> via <code>structlog</code> throughout — every event has a <code>job_id</code>, <code>api_path</code>, and <code>error</code> key for easy filtering</li>
+            <li><strong>Input validation</strong> on every API endpoint using Pydantic validators with explicit, user-safe error messages</li>
+          </ul>"
+        </div>
+      </div>
+
+      <!-- Measurement -->
+      <div class="sub" style="border-color:#10B981;">
+        <div class="sub-header">
+          <span class="sub-title">Measurement Methodology</span>
+          <span class="time-chip">~25s</span>
+        </div>
+        <div class="speech">
+          "We built the measurement capability into the product itself:
+          <ul style="margin-top:.6rem;">
+            <li><strong>SLA Tracker</strong> compares real-time CloudWatch error rates and p99 latency against per-API configurable targets</li>
+            <li><strong>Deployment Tracker</strong> correlates every GitHub Actions deployment with error spikes in a 30-minute window automatically</li>
+            <li><strong>Anomaly Detector</strong> uses <strong>linear regression</strong> to predict when an error rate will breach its threshold — and alerts proactively, before the breach happens</li>
+            <li><strong>Z-score analysis</strong> identifies traffic spikes and drops statistically — flags anything beyond 2.5 standard deviations</li>
+          </ul>"
+        </div>
+      </div>
+
+      <!-- Quantified Results -->
+      <div class="sub" style="border-color:#10B981;">
+        <div class="sub-header">
+          <span class="sub-title">Quantified Results</span>
+          <span class="time-chip">~25s</span>
+        </div>
+        <div class="speech">
+          "Here's what SynapseOps eliminates from your team's workflow:
+          <ul style="margin-top:.6rem;">
+            <li><strong>PR review time</strong>: From hours-to-days of async review to <strong>seconds</strong> — every PR gets an AI review comment the moment it's opened</li>
+            <li><strong>Pipeline triage time</strong>: From 20–40 minutes of manual log digging to <strong>automated root cause analysis and a code fix committed to the branch</strong></li>
+            <li><strong>Alert fatigue</strong>: Cooldown-based deduplication reduces notification volume — one alert per API per hour maximum</li>
+            <li><strong>War room resolution</strong>: The NL chat interface gives any engineer instant access — 'Show me errors for <code>/api/payments</code> in the last 2 hours' — no CloudWatch console access required</li>
+          </ul>"
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── SECTION 4 ─── -->
+  <div class="section-card s4">
+    <div class="section-header">
+      <div class="section-icon">💡</div>
+      <div class="section-title-block">
+        <h2>Section 4 — Innovation &amp; Creativity</h2>
+        <span class="badge">1:30</span>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <!-- Creative Architecture -->
+      <div class="sub" style="border-color:#F59E0B;">
+        <div class="sub-header">
+          <span class="sub-title">Creative Idea / Architecture</span>
+          <span class="time-chip">~20s</span>
+        </div>
+        <div class="speech">
+          "The creative insight behind SynapseOps is <strong>treating DevOps as an agent-coordination problem, not a tooling problem</strong>.<br/><br/>
+          Most DevOps platforms give you dashboards. SynapseOps gives you <strong>autonomous agents with agency</strong> — each one purpose-built for a single cognitive task. The Diff Analyst doesn't know about PR priority. The Priority Assessor doesn't write summaries. This separation means each agent can be fine-tuned, replaced, or upgraded independently.<br/><br/>
+          The other insight is <strong>predictive, not reactive, monitoring</strong> — we alert before a threshold is breached using trend analysis, not just after. That's a fundamentally different operational posture."
+        </div>
+      </div>
+
+      <!-- Community Impact -->
+      <div class="sub" style="border-color:#F59E0B;">
+        <div class="sub-header">
+          <span class="sub-title">Community Impact Potential</span>
+          <span class="time-chip">~25s</span>
+        </div>
+        <div class="speech">
+          "The impact model here is significant:
+          <ul style="margin-top:.6rem;">
+            <li><strong>Any team on GitHub + AWS</strong> can adopt this — no proprietary toolchain required</li>
+            <li>Small engineering teams gain the code review throughput of a much larger team</li>
+            <li>Platform engineers get a pre-built observability brain without building CloudWatch dashboards from scratch</li>
+            <li>The <strong>AI-DLC methodology</strong> — our KIRO-driven development approach documented in <code>aidlc-docs/</code> — is itself a reusable blueprint that any team could follow</li>
+          </ul>
+          Think of SynapseOps as an open template for AI-driven DevOps that any organization can fork, configure, and deploy in a single afternoon."
+        </div>
+      </div>
+
+      <!-- Technical Depth -->
+      <div class="sub" style="border-color:#F59E0B;">
+        <div class="sub-header">
+          <span class="sub-title">Technical Depth &amp; Presentation</span>
+          <span class="time-chip">~45s</span>
+        </div>
+        <div class="speech">
+          "Let me leave you with the technical highlights that demonstrate real depth:<br/><br/>
+          <strong>Multi-model support</strong> — <code>LLMService</code> auto-detects the model family from <code>model_id</code> and constructs the correct request body format. Switching from Claude to Nova to Llama is a config change.<br/><br/>
+          <strong>Statistical anomaly detection</strong> — we implement both linear regression for trend prediction and z-score analysis for spike detection — two separate statistical methods, zero ML libraries, pure Python math.<br/><br/>
+          <strong>Dual-backend Bedrock</strong> — the same service layer seamlessly routes between direct <code>bedrock-runtime</code> inference and <code>bedrock-agent-runtime</code>'s AgentCore, with full session management for stateful agents.<br/><br/>
+          <strong>Event-driven deduplication</strong> — webhook delivery is at-least-once; our dedup layer ensures idempotency so a re-delivered event never triggers two PR reviews.<br/><br/>
+          <strong>KIRO-generated, production-hardened</strong> — the entire application was designed through KIRO's AI-DLC, and then hardened with observability, retry logic, and rate limiting that any production team would expect.<br/><br/>
+          This is what an AI-native application looks like when built with discipline."
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── CLOSING ─── -->
+  <div class="section-card s-close" style="border-left:4px solid var(--aws-orange);">
+    <div class="section-header">
+      <div class="section-icon">🏁</div>
+      <div class="section-title-block">
+        <h2 style="color:#FF9900;">Closing</h2>
+        <span class="badge" style="background:rgba(255,153,0,.15);color:#FF9900;">0:30</span>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="speech">
+        "SynapseOps is live, it's deployed on AWS, and it's wired to a real GitHub repository right now.<br/><br/>
+        We built it with <strong>KIRO</strong>. We run it on <strong>Bedrock</strong>. And it's already doing work that used to require an engineer.<br/><br/>
+        That's developer productivity — quantified, automated, and delivered. <strong>Thank you.</strong>"
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── DEMO CHECKLIST ─── -->
+  <div class="section-card" style="border-left:4px solid #10B981;">
+    <div class="section-header" style="background:linear-gradient(90deg,#F0FDF4,#DCFCE7);">
+      <div class="section-icon" style="background:#DCFCE7;color:#047857;">✅</div>
+      <div class="section-title-block">
+        <h2 style="color:#047857;">Demo Checkpoints — Have Ready Before You Start</h2>
+      </div>
+    </div>
+    <div class="section-body">
+      <ul class="checklist">
+        <li>
+          <span class="check-icon">🌐</span>
+          <span><strong>Live dashboard URL:</strong> <code>http://synapse-ops-alb-1042958172.ap-south-1.elb.amazonaws.com</code></span>
+        </li>
+        <li>
+          <span class="check-icon">🐙</span>
+          <span><strong>GitHub repo with a sample PR:</strong> <code>TapasNayak123/aws_codethon_repo</code></span>
+        </li>
+        <li>
+          <span class="check-icon">📐</span>
+          <span><strong>Architecture diagram open:</strong> <code>docs/AWS_Architecture.html</code></span>
+        </li>
+        <li>
+          <span class="check-icon">💬</span>
+          <span><strong>Teams notification screenshot</strong> ready (fallback if live webhook isn't feasible during demo)</span>
+        </li>
+        <li>
+          <span class="check-icon">📁</span>
+          <span><strong><code>aidlc-docs/</code></strong> folder open in file explorer to visually showcase KIRO AI-DLC artifacts</span>
+        </li>
+        <li>
+          <span class="check-icon">⚙️</span>
+          <span><strong>ECS task definition</strong> (<code>ecs/task-definition.json</code>) open to show deployment config at a glance</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+</body>
+</html>
